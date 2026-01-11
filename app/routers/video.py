@@ -26,6 +26,12 @@ from ..models import (
     TextVideoSegmentRequest,
     Sam3SegmentRequest,
     Sam3SegmentResponse,
+    ReplaceObjectRequest,
+    ReplaceObjectResponse,
+    FramewiseReplaceRequest,
+    FramewiseReplaceResponse,
+    VaceReplaceRequest,
+    VaceReplaceResponse,
 )
 from core.pipeline import VideoPipeline, PipelineStage
 
@@ -481,6 +487,310 @@ async def segment_video_with_sam3(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"SAM3 video segmentation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/replace-object", response_model=ReplaceObjectResponse)
+async def replace_object(
+    request: ReplaceObjectRequest,
+    pipeline: VideoPipeline = Depends(get_pipeline)
+):
+    """
+    Replace masked object in video using Wan 2.1 inpainting.
+    
+    Requires SAM3 segmentation to be run first with mask_only=True.
+    The mask video (white = object to replace) will be used to guide replacement.
+    
+    Example workflow:
+        1. POST /api/segment-video-sam3 with mask_only=true
+        2. POST /api/replace-object with replacement_prompt="a red Coca-Cola can"
+    """
+    job = pipeline.get_job(request.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if not job.segmented_video_path:
+        raise HTTPException(
+            status_code=400, 
+            detail="Run SAM3 segmentation first with mask_only=true."
+        )
+    
+    try:
+        job = pipeline.replace_object(
+            job_id=request.job_id,
+            replacement_prompt=request.replacement_prompt,
+            num_frames=request.num_frames,
+            guidance_scale=request.guidance_scale
+        )
+        
+        download_path = None
+        if job.output_path and job.output_path.exists():
+            download_path = f"/api/download/{request.job_id}"
+        
+        return ReplaceObjectResponse(
+            job_id=request.job_id,
+            status="completed",
+            download_path=download_path,
+            replacement_prompt=request.replacement_prompt,
+            message=f"Object replaced with '{request.replacement_prompt}'"
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Object replacement failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/replace-object-framewise", response_model=FramewiseReplaceResponse)
+async def replace_object_framewise(
+    request: FramewiseReplaceRequest,
+    pipeline: VideoPipeline = Depends(get_pipeline)
+):
+    """
+    Replace object in video frame-by-frame using Gemini image editing.
+    
+    This uses Nano Banana (Gemini 2.5 Flash Image) to edit each keyframe,
+    then combines them back into a video. Supports reference images!
+    
+    Example:
+        object_prompt: "coffee cup"
+        replacement_prompt: "red Coca-Cola can"
+        reference_image_url: "https://example.com/coke.jpg" (optional)
+    """
+    job = pipeline.get_job(request.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if not job.frame_paths:
+        raise HTTPException(
+            status_code=400,
+            detail="No frames found. Upload video first via /upload."
+        )
+    
+    # Handle reference image if provided
+    reference_path = None
+    if request.reference_image_url:
+        import httpx
+        from pathlib import Path
+        try:
+            # Download reference image
+            job_dir = Path(f"storage/jobs/{request.job_id}")
+            reference_path = job_dir / "reference_image.jpg"
+            with httpx.Client(timeout=30.0) as client:
+                response = client.get(request.reference_image_url, follow_redirects=True)
+                response.raise_for_status()
+                with open(reference_path, 'wb') as f:
+                    f.write(response.content)
+            logger.info(f"Downloaded reference image to {reference_path}")
+        except Exception as e:
+            logger.warning(f"Failed to download reference image: {e}")
+    
+    try:
+        job = pipeline.replace_object_framewise(
+            job_id=request.job_id,
+            object_prompt=request.object_prompt,
+            replacement_prompt=request.replacement_prompt,
+            reference_image_path=reference_path,
+            frame_interval=request.frame_interval
+        )
+        
+        download_path = None
+        if job.output_path and job.output_path.exists():
+            download_path = f"/api/download/{request.job_id}"
+        
+        return FramewiseReplaceResponse(
+            job_id=request.job_id,
+            status="completed",
+            download_path=download_path,
+            frames_processed=len(job.inpainted_paths) if job.inpainted_paths else 0,
+            frames_total=len(job.frame_paths) if job.frame_paths else 0,
+            message=f"Replaced '{request.object_prompt}' with '{request.replacement_prompt}'"
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Framewise replacement failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/replace-object-with-reference", response_model=FramewiseReplaceResponse)
+async def replace_object_with_reference(
+    job_id: str,
+    object_prompt: str,
+    replacement_prompt: str,
+    reference_image: UploadFile,
+    frame_interval: int = 1,
+    pipeline: VideoPipeline = Depends(get_pipeline)
+):
+    """
+    Replace object with a LOCAL reference image upload.
+    
+    Upload your reference image (e.g., coke-can.jpg) and it will be used
+    for consistent object replacement across all frames.
+    """
+    job = pipeline.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if not job.frame_paths:
+        raise HTTPException(
+            status_code=400,
+            detail="No frames found. Upload video first via /upload."
+        )
+    
+    # Save uploaded reference image
+    from pathlib import Path
+    job_dir = Path(f"storage/jobs/{job_id}")
+    reference_path = job_dir / f"reference_{reference_image.filename}"
+    
+    with open(reference_path, 'wb') as f:
+        content = await reference_image.read()
+        f.write(content)
+    
+    logger.info(f"Saved reference image to {reference_path}")
+    
+    try:
+        job = pipeline.replace_object_framewise(
+            job_id=job_id,
+            object_prompt=object_prompt,
+            replacement_prompt=replacement_prompt,
+            reference_image_path=reference_path,
+            frame_interval=frame_interval
+        )
+        
+        download_path = None
+        if job.output_path and job.output_path.exists():
+            download_path = f"/api/download/{job_id}"
+        
+        return FramewiseReplaceResponse(
+            job_id=job_id,
+            status="completed",
+            download_path=download_path,
+            frames_processed=len(job.inpainted_paths) if job.inpainted_paths else 0,
+            frames_total=len(job.frame_paths) if job.frame_paths else 0,
+            message=f"Replaced '{object_prompt}' with '{replacement_prompt}' using reference image"
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Framewise replacement with reference failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/replace-with-vace", response_model=VaceReplaceResponse)
+async def replace_with_vace(
+    request: VaceReplaceRequest,
+    pipeline: VideoPipeline = Depends(get_pipeline)
+):
+    """
+    Replace masked object using fal.ai VACE video inpainting. ⭐
+    
+    This is the BEST method for object replacement:
+    1. First run SAM3 segmentation with mask_only=true
+    2. Then call this endpoint with a prompt
+    
+    Example workflow:
+        POST /api/segment-video-sam3 {"text_prompt": "coffee cup", "mask_only": true}
+        POST /api/replace-with-vace {"prompt": "red Coca-Cola can"}
+    """
+    job = pipeline.get_job(request.job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if not job.segmented_video_path:
+        raise HTTPException(
+            status_code=400,
+            detail="No mask video found. Run SAM3 segmentation with mask_only=true first."
+        )
+    
+    try:
+        job = pipeline.replace_with_vace(
+            job_id=request.job_id,
+            prompt=request.prompt,
+            num_inference_steps=request.num_inference_steps,
+            guidance_scale=request.guidance_scale
+        )
+        
+        download_path = None
+        if job.output_path and job.output_path.exists():
+            download_path = f"/api/download/{request.job_id}"
+        
+        return VaceReplaceResponse(
+            job_id=request.job_id,
+            status="completed",
+            download_path=download_path,
+            message=f"Object replaced using VACE inpainting"
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"VACE replacement failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/replace-with-vace-ref", response_model=VaceReplaceResponse)
+async def replace_with_vace_reference(
+    job_id: str,
+    prompt: str,
+    reference_image: UploadFile,
+    num_inference_steps: int = 30,
+    guidance_scale: float = 5.0,
+    pipeline: VideoPipeline = Depends(get_pipeline)
+):
+    """
+    Replace masked object using VACE + reference image. ⭐
+    
+    Upload a reference image (e.g., coke-can.jpg) for better accuracy.
+    """
+    job = pipeline.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if not job.segmented_video_path:
+        raise HTTPException(
+            status_code=400,
+            detail="No mask video found. Run SAM3 segmentation with mask_only=true first."
+        )
+    
+    # Save uploaded reference image
+    from pathlib import Path
+    job_dir = Path(f"storage/jobs/{job_id}")
+    reference_path = job_dir / f"reference_{reference_image.filename}"
+    
+    with open(reference_path, 'wb') as f:
+        content = await reference_image.read()
+        f.write(content)
+    
+    logger.info(f"Saved reference image to {reference_path}")
+    
+    try:
+        job = pipeline.replace_with_vace(
+            job_id=job_id,
+            prompt=prompt,
+            reference_image_path=reference_path,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale
+        )
+        
+        download_path = None
+        if job.output_path and job.output_path.exists():
+            download_path = f"/api/download/{job_id}"
+        
+        return VaceReplaceResponse(
+            job_id=job_id,
+            status="completed",
+            download_path=download_path,
+            message=f"Object replaced using VACE + reference image"
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"VACE replacement with reference failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

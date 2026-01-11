@@ -600,6 +600,251 @@ class VideoPipeline:
             logger.error(f"SAM3 video segmentation failed: {e}")
             raise
     
+    def replace_object(
+        self,
+        job_id: str,
+        replacement_prompt: str,
+        num_frames: int = 81,
+        guidance_scale: float = 5.0
+    ) -> "JobState":
+        """
+        Replace masked object in video using Wan 2.1 inpainting.
+        
+        Requires SAM3 segmentation to have been run first with mask_only=True.
+        
+        Args:
+            job_id: Job ID from create_job (must have segmented_video_path from SAM3)
+            replacement_prompt: Text describing replacement (e.g., "a red Coca-Cola can")
+            num_frames: Number of output frames
+            guidance_scale: Guidance scale for generation
+            
+        Returns:
+            Updated JobState with replaced_video_path
+        """
+        from .inpaint_engine import WanInpaintingEngine
+        
+        job = self.jobs.get(job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+        
+        # Check for original video
+        if not job.video_path or not job.video_path.exists():
+            raise ValueError("Original video not found. Upload video first via /upload.")
+        
+        # Check for mask video (from SAM3 with mask_only=True)
+        if not job.segmented_video_path or not job.segmented_video_path.exists():
+            raise ValueError(
+                "Mask video not found. Run SAM3 segmentation first with mask_only=True."
+            )
+        
+        job.stage = PipelineStage.INPAINTING
+        job.progress = 10
+        
+        try:
+            # Initialize Wan inpainting engine
+            logger.info("Initializing Wan 2.1 Inpainting engine...")
+            inpainter = WanInpaintingEngine(api_token=self.replicate_api_token)
+            
+            job.progress = 20
+            
+            # Replace object
+            logger.info(f"Replacing object with prompt: '{replacement_prompt}'")
+            result = inpainter.replace_object(
+                video_path=str(job.video_path),
+                mask_path=str(job.segmented_video_path),
+                prompt=replacement_prompt,
+                num_frames=num_frames,
+                guidance_scale=guidance_scale
+            )
+            
+            job.progress = 70
+            
+            # Download the result
+            output_url = result.get("output_url")
+            if output_url:
+                job_dir = self._get_job_dir(job_id)
+                output_path = job_dir / "replaced_object.mp4"
+                
+                inpainter.download_result(output_url, output_path)
+                job.output_path = output_path
+            
+            job.stage = PipelineStage.COMPLETED
+            job.progress = 100
+            
+            logger.info(f"Job {job_id}: Object replacement complete with prompt '{replacement_prompt}'")
+            
+            return job
+            
+        except Exception as e:
+            job.stage = PipelineStage.FAILED
+            job.error = str(e)
+            logger.error(f"Object replacement failed: {e}")
+            raise
+    
+    def replace_object_framewise(
+        self,
+        job_id: str,
+        object_prompt: str,
+        replacement_prompt: str,
+        reference_image_path: Optional[Path] = None,
+        frame_interval: int = 10
+    ) -> "JobState":
+        """
+        Replace object in video frame-by-frame using Gemini image editing.
+        
+        Args:
+            job_id: Job ID from create_job
+            object_prompt: What object to find (e.g., "coffee cup")
+            replacement_prompt: What to replace with (e.g., "red Coca-Cola can")
+            reference_image_path: Optional path to reference image
+            frame_interval: Process every Nth frame (default 10)
+            
+        Returns:
+            Updated JobState with output_path
+        """
+        from .gemini_inpaint_engine import GeminiInpaintEngine
+        
+        job = self.jobs.get(job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+        
+        if not job.frame_paths:
+            raise ValueError("Frames not extracted. Upload video first via /upload.")
+        
+        job.stage = PipelineStage.INPAINTING
+        job.progress = 5
+        
+        try:
+            # Initialize Gemini engine
+            logger.info("Initializing Gemini Inpaint engine...")
+            from app.config import get_settings
+            settings = get_settings()
+            gemini = GeminiInpaintEngine(api_key=settings.gemini_api_key)
+            
+            job.progress = 10
+            
+            # Process frames
+            job_dir = self._get_job_dir(job_id)
+            edited_dir = job_dir / "edited_frames"
+            
+            def progress_update(pct, msg):
+                job.progress = 10 + (pct * 0.7)  # 10-80%
+                logger.info(f"Progress: {pct:.1f}% - {msg}")
+            
+            edited_paths = gemini.process_frames(
+                frame_paths=job.frame_paths,
+                object_prompt=object_prompt,
+                replacement_prompt=replacement_prompt,
+                reference_image_path=reference_image_path,
+                frame_interval=frame_interval,
+                output_dir=edited_dir,
+                progress_callback=progress_update
+            )
+            
+            job.progress = 80
+            
+            # Build output video
+            output_path = job_dir / "replaced_framewise.mp4"
+            video_info = job.video_info or {}
+            fps = video_info.get("fps", 25)
+            
+            self.video_builder.build_video(
+                frames_dir=edited_dir,
+                output_path=output_path,
+                fps=fps,
+                audio_path=job.audio_path if job.audio_path and job.audio_path.exists() else None
+            )
+            
+            job.output_path = output_path
+            job.inpainted_paths = edited_paths
+            job.stage = PipelineStage.COMPLETED
+            job.progress = 100
+            
+            logger.info(f"Job {job_id}: Framewise replacement complete - {len(edited_paths)} frames")
+            
+            return job
+            
+        except Exception as e:
+            job.stage = PipelineStage.FAILED
+            job.error = str(e)
+            logger.error(f"Framewise replacement failed: {e}")
+            raise
+    
+    def replace_with_vace(
+        self,
+        job_id: str,
+        prompt: str = "",
+        reference_image_path: Optional[Path] = None,
+        num_inference_steps: int = 30,
+        guidance_scale: float = 5.0
+    ) -> "JobState":
+        """
+        Replace masked object using fal.ai VACE video inpainting.
+        
+        Requires SAM3 segmentation to be run first with mask_only=True.
+        
+        Args:
+            job_id: Job ID from create_job
+            prompt: Text prompt for replacement (optional)
+            reference_image_path: Optional path to reference image
+            num_inference_steps: Diffusion steps (default 30)
+            guidance_scale: Prompt guidance (default 5.0)
+            
+        Returns:
+            Updated JobState with output_path
+        """
+        from .fal_vace_engine import FalVaceEngine
+        
+        job = self.jobs.get(job_id)
+        if not job:
+            raise ValueError(f"Job {job_id} not found")
+        
+        if not job.video_path:
+            raise ValueError("No video found. Upload video first.")
+        
+        if not job.segmented_video_path:
+            raise ValueError("No mask video found. Run SAM3 segmentation with mask_only=True first.")
+        
+        job.stage = PipelineStage.INPAINTING
+        job.progress = 10
+        
+        try:
+            # Initialize fal.ai VACE engine
+            logger.info("Initializing fal.ai VACE engine...")
+            from app.config import get_settings
+            settings = get_settings()
+            vace = FalVaceEngine(api_key=settings.fal_key)
+            
+            job.progress = 20
+            
+            # Run VACE inpainting
+            job_dir = self._get_job_dir(job_id)
+            output_path = job_dir / "replaced_vace.mp4"
+            
+            result_path = vace.replace_and_download(
+                video_path=job.video_path,
+                mask_video_path=job.segmented_video_path,
+                output_path=output_path,
+                prompt=prompt,
+                reference_image_path=reference_image_path,
+                num_inference_steps=num_inference_steps,
+                guidance_scale=guidance_scale
+            )
+            
+            job.output_path = result_path
+            job.stage = PipelineStage.COMPLETED
+            job.progress = 100
+            
+            logger.info(f"Job {job_id}: VACE replacement complete - {result_path}")
+            
+            return job
+            
+        except Exception as e:
+            job.stage = PipelineStage.FAILED
+            job.error = str(e)
+            logger.error(f"VACE replacement failed: {e}")
+            raise
+    
     def run_full_pipeline(
         self,
         video_path: Path,

@@ -75,7 +75,8 @@ async def root():
             "replace": "POST /api/replace",
             "segment_video": "POST /api/segment-video (coordinates)",
             "segment_video_text": "POST /api/segment-video-text (Replicate)",
-            "segment_video_sam3": "POST /api/segment-video-sam3 (local SAM3) ⭐",
+            "segment_video_sam3": "POST /api/segment-video-sam3 (SAM3 text→mask)",
+            "replace_object": "POST /api/replace-object (Wan 2.1 inpainting) ⭐",
             "status": "GET /api/status/{job_id}",
             "download": "GET /api/download/{job_id}",
             "download_segmented": "GET /api/download-segmented/{job_id}"

@@ -70,6 +70,8 @@ class Settings(BaseSettings):
     # API Keys
     replicate_api_token: str = ""
     hf_token: str = ""  # HuggingFace token for SAM3
+    gemini_api_key: str = ""  # Gemini API key for Nano Banana image editing
+    fal_key: str = ""  # fal.ai API key for VACE video inpainting
     
     # Server Configuration
     host: str = "0.0.0.0"

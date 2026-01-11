@@ -149,3 +149,75 @@ class Sam3SegmentResponse(BaseModel):
     output_url: Optional[str] = None
     text_prompt: str = ""
     message: str = ""
+
+
+class ReplaceObjectRequest(BaseModel):
+    """Request to replace masked object in video using Wan 2.1 inpainting."""
+    job_id: str = Field(..., description="Job ID with SAM3 segmentation")
+    replacement_prompt: str = Field(
+        ...,
+        description="Text describing the replacement object (e.g., 'a red Coca-Cola can')"
+    )
+    num_frames: int = Field(81, ge=1, le=200, description="Number of output frames")
+    guidance_scale: float = Field(5.0, ge=1.0, le=20.0, description="Guidance scale")
+
+
+class ReplaceObjectResponse(BaseModel):
+    """Response from object replacement."""
+    job_id: str
+    status: str
+    download_path: Optional[str] = None
+    output_url: Optional[str] = None
+    replacement_prompt: str = ""
+    message: str = ""
+
+
+class FramewiseReplaceRequest(BaseModel):
+    """Request for frame-by-frame object replacement using Gemini."""
+    job_id: str = Field(..., description="Job ID from video upload")
+    object_prompt: str = Field(
+        ...,
+        description="What object to find (e.g., 'coffee cup')"
+    )
+    replacement_prompt: str = Field(
+        ...,
+        description="What to replace it with (e.g., 'red Coca-Cola can')"
+    )
+    reference_image_url: Optional[str] = Field(
+        None,
+        description="Optional URL to reference image for the replacement"
+    )
+    frame_interval: int = Field(
+        10, ge=1, le=100,
+        description="Process every Nth frame (default 10)"
+    )
+
+
+class FramewiseReplaceResponse(BaseModel):
+    """Response from frame-by-frame replacement."""
+    job_id: str
+    status: str
+    download_path: Optional[str] = None
+    frames_processed: int = 0
+    frames_total: int = 0
+    message: str = ""
+
+
+class VaceReplaceRequest(BaseModel):
+    """Request for VACE video inpainting (fal.ai)."""
+    job_id: str = Field(..., description="Job ID from video upload")
+    prompt: str = Field(
+        "",
+        description="Text prompt for replacement content (e.g., 'red Coca-Cola can')"
+    )
+    num_inference_steps: int = Field(30, ge=10, le=50, description="Diffusion steps")
+    guidance_scale: float = Field(5.0, ge=1.0, le=15.0, description="Prompt guidance")
+
+
+class VaceReplaceResponse(BaseModel):
+    """Response from VACE video inpainting."""
+    job_id: str
+    status: str
+    download_path: Optional[str] = None
+    video_url: Optional[str] = None
+    message: str = ""
