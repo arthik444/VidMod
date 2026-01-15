@@ -1,25 +1,65 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
-import VideoWorkspace from './VideoWorkspace';
+import VideoWorkspace, { type Finding } from './VideoWorkspace';
 import RightPanel from './RightPanel';
-import UploadZone from './UploadZone';
-import type { VideoMetadata } from './UploadZone';
+import UploadZone, { type VideoMetadata } from './UploadZone';
+
+const MOCK_FINDINGS: Finding[] = [
+    {
+        id: 1,
+        type: 'Brand Logo',
+        content: 'Coca-Cola',
+        status: 'warning',
+        startTime: 2,
+        endTime: 5,
+        box: { top: 20, left: 30, width: 15, height: 10 }
+    },
+    {
+        id: 2,
+        type: 'Restricted Object',
+        content: 'Cigarette',
+        status: 'critical',
+        startTime: 8,
+        endTime: 12,
+        box: { top: 60, left: 45, width: 20, height: 15 }
+    },
+    {
+        id: 3,
+        type: 'Offensive Language',
+        content: 'Explicit Lyric',
+        status: 'critical',
+        startTime: 12,
+        endTime: 14
+    },
+];
 
 const AppLayout: React.FC = () => {
     const [activeTab, setActiveTab] = useState('Upload');
-    const [videoFile, setVideoFile] = useState<File | null>(null);
     const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
+    const [findings, setFindings] = useState<Finding[]>([]);
+    const [currentTime, setCurrentTime] = useState(0);
 
-    const handleUploadComplete = (file: File, metadata: VideoMetadata) => {
-        setVideoFile(file);
+    // We'll use a ref to expose a seek function or similar if needed, 
+    // but for simple local interactivity, we can pass a timestamp to seek to.
+    const [seekToTimestamp, setSeekToTimestamp] = useState<number | null>(null);
+
+    const handleUploadComplete = (metadata: VideoMetadata) => {
         setVideoMetadata(metadata);
-        setVideoUrl(URL.createObjectURL(file));
+        setVideoUrl(metadata.url);
+        setFindings(MOCK_FINDINGS);
         setActiveTab('Analysis');
     };
 
-    console.log('AppLayout videoFile:', videoFile); // for debugging if needed
+    const handleSeekTo = (time: string) => {
+        // Convert "MM:SS" or "00:SS" to seconds
+        const parts = time.split(':');
+        const seconds = parseInt(parts[0]) * 60 + parseInt(parts[1]);
+        setSeekToTimestamp(seconds);
+        // Reset after passing
+        setTimeout(() => setSeekToTimestamp(null), 100);
+    };
 
     return (
         <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -38,10 +78,21 @@ const AppLayout: React.FC = () => {
                     ) : (
                         <>
                             <div className="flex-[3] min-w-0">
-                                <VideoWorkspace videoUrl={videoUrl || undefined} metadata={videoMetadata || undefined} />
+                                <VideoWorkspace
+                                    videoUrl={videoUrl || undefined}
+                                    metadata={videoMetadata || undefined}
+                                    seekTo={seekToTimestamp ?? undefined}
+                                    findings={findings}
+                                    onTimeUpdate={setCurrentTime}
+                                />
                             </div>
                             <div className="flex-1 min-w-[300px] max-w-[400px]">
-                                <RightPanel activeTab={activeTab} />
+                                <RightPanel
+                                    activeTab={activeTab}
+                                    onSeekTo={handleSeekTo}
+                                    findings={findings}
+                                    currentTime={currentTime}
+                                />
                             </div>
                         </>
                     )}

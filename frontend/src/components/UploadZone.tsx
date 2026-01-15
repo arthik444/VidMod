@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload as UploadIcon, FileVideo, X, CheckCircle2, Loader2, Play } from 'lucide-react';
+import { Upload as UploadIcon, X, CheckCircle2, Loader2, Play } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -8,7 +8,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 interface UploadZoneProps {
-    onUploadComplete: (file: File, metadata: VideoMetadata) => void;
+    onUploadComplete: (metadata: VideoMetadata) => void;
 }
 
 export interface VideoMetadata {
@@ -16,11 +16,12 @@ export interface VideoMetadata {
     size: string;
     duration: string;
     resolution: string;
+    url: string;
 }
 
 const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
     const [isDragging, setIsDragging] = useState(false);
-    const [file, setFile] = useState<File | null>(null);
+    const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'ready'>('idle');
     const [progress, setProgress] = useState(0);
     const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
@@ -52,55 +53,61 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
     };
 
     const handleFileSelection = (selectedFile: File) => {
-        setFile(selectedFile);
+        const url = URL.createObjectURL(selectedFile);
+        setVideoUrl(url);
         setStatus('uploading');
         setProgress(0);
 
-        // Simulate upload and processing
-        simulateProgress();
+        // Actually extract some metadata using a temporary video element
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = () => {
+            setMetadata({
+                name: selectedFile.name,
+                size: (selectedFile.size / (1024 * 1024)).toFixed(2) + ' MB',
+                duration: `${Math.floor(video.duration)}s`,
+                resolution: `${video.videoWidth}x${video.videoHeight}`,
+                url: url
+            });
+        };
+        video.src = url;
 
-        // Extract metadata (mocked for now, but could use a hidden video element)
-        setMetadata({
-            name: selectedFile.name,
-            size: (selectedFile.size / (1024 * 1024)).toFixed(2) + ' MB',
-            duration: '00:15', // Mocked max 20s
-            resolution: '1920x1080'
-        });
+        // Simulate progress for UI feel
+        simulateProgress();
     };
 
     const simulateProgress = () => {
-        let currentProgress = 0;
-        const interval = setInterval(() => {
-            currentProgress += Math.random() * 15;
-            if (currentProgress >= 100) {
-                currentProgress = 100;
-                clearInterval(interval);
-
-                if (status === 'uploading') {
-                    setStatus('processing');
-                    setTimeout(() => simulateProcessing(), 500);
-                }
-            }
-            setProgress(Math.min(currentProgress, 100));
-        }, 300);
-    };
-
-    const simulateProcessing = () => {
-        setProgress(0);
         let currentProgress = 0;
         const interval = setInterval(() => {
             currentProgress += Math.random() * 10;
             if (currentProgress >= 100) {
                 currentProgress = 100;
                 clearInterval(interval);
+
+                setStatus('processing');
+                setTimeout(() => simulateProcessing(), 500);
+            }
+            setProgress(Math.min(currentProgress, 100));
+        }, 200);
+    };
+
+    const simulateProcessing = () => {
+        setProgress(0);
+        let currentProgress = 0;
+        const interval = setInterval(() => {
+            currentProgress += Math.random() * 8;
+            if (currentProgress >= 100) {
+                currentProgress = 100;
+                clearInterval(interval);
                 setStatus('ready');
             }
             setProgress(Math.min(currentProgress, 100));
-        }, 400);
+        }, 300);
     };
 
     const reset = () => {
-        setFile(null);
+        if (videoUrl) URL.revokeObjectURL(videoUrl);
+        setVideoUrl(null);
         setStatus('idle');
         setProgress(0);
         setMetadata(null);
@@ -109,9 +116,9 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
     return (
         <div className="h-full flex flex-col items-center justify-center p-8 bg-background">
             <div className="w-full max-w-2xl">
-                <div className="mb-8 text-center">
-                    <h1 className="text-2xl font-bold mb-2 tracking-tight">Upload Video for Analysis</h1>
-                    <p className="text-muted-foreground text-sm">Zenith Sensor automatically detects compliance violations in your content.</p>
+                <div className="mb-8 text-center animate-in fade-in slide-in-from-top-4 duration-700">
+                    <h1 className="text-3xl font-bold mb-2 tracking-tight">Upload Video for Analysis</h1>
+                    <p className="text-muted-foreground">Zenith Sensor automatically detects compliance violations locally.</p>
                 </div>
 
                 <div
@@ -119,28 +126,31 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     className={cn(
-                        "relative rounded-2xl border-2 border-dashed transition-all duration-300 flex flex-col items-center justify-center p-12 min-h-[400px] bg-card/30",
-                        isDragging ? "border-accent bg-accent/5 scale-[1.02]" : "border-border hover:border-muted/50",
-                        status !== 'idle' && "border-solid border-border pointer-events-none"
+                        "relative rounded-3xl border-2 border-dashed transition-all duration-500 flex flex-col items-center justify-center p-12 min-h-[450px] bg-card/20 backdrop-blur-sm",
+                        isDragging ? "border-accent bg-accent/10 scale-[1.02] shadow-[0_0_40px_rgba(59,130,246,0.1)]" : "border-border hover:border-accent/40 hover:bg-card/40",
+                        status !== 'idle' && "border-solid border-border-muted pointer-events-none"
                     )}
                 >
                     {status === 'idle' && (
                         <>
-                            <div className="w-20 h-20 rounded-full bg-muted/20 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                                <UploadIcon className="w-8 h-8 text-muted-foreground" />
+                            <div className="w-24 h-24 rounded-full bg-accent/10 flex items-center justify-center mb-8 group-hover:scale-110 transition-all duration-500 shadow-inner">
+                                <UploadIcon className="w-10 h-10 text-accent" />
                             </div>
-                            <div className="text-center space-y-4">
-                                <div className="space-y-1">
-                                    <p className="text-lg font-medium text-foreground">Drag and drop video files to upload</p>
-                                    <p className="text-sm text-muted-foreground">Your videos will be private until you publish them.</p>
+                            <div className="text-center space-y-6">
+                                <div className="space-y-2">
+                                    <p className="text-xl font-semibold text-foreground">Drag and drop video files to upload</p>
+                                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">Upload content to detect brands, restricted objects, and offensive language.</p>
                                 </div>
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="px-6 py-2.5 bg-accent text-white rounded-lg font-bold shadow-lg shadow-accent/20 hover:opacity-90 transition-all active:scale-95"
+                                    className="px-8 py-3 bg-accent text-white rounded-xl font-bold shadow-xl shadow-accent/25 hover:opacity-90 hover:translate-y-[-2px] transition-all active:scale-95"
                                 >
                                     Select File
                                 </button>
-                                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest mt-8">MAX 20 SECONDS • MP4, MOV</p>
+                                <div className="flex gap-4 justify-center items-center mt-12">
+                                    <span className="text-[10px] bg-muted/30 px-3 py-1 rounded-full font-bold text-muted-foreground tracking-widest uppercase">Max 20s</span>
+                                    <span className="text-[10px] bg-muted/30 px-3 py-1 rounded-full font-bold text-muted-foreground tracking-widest uppercase">MP4 / MOV</span>
+                                </div>
                             </div>
                             <input
                                 ref={fileInputRef}
@@ -153,54 +163,64 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                     )}
 
                     {status !== 'idle' && (
-                        <div className="w-full space-y-8 animate-in fade-in duration-500">
-                            <div className="flex items-center gap-6 p-6 rounded-xl bg-background/50 border border-border">
-                                <div className="w-16 h-16 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                                    <FileVideo className="w-8 h-8 text-accent" />
+                        <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <div className="flex items-center gap-6 p-6 rounded-2xl bg-background/40 border border-border/50 backdrop-blur-md shadow-2xl overflow-hidden">
+                                <div className="w-32 h-20 rounded-xl bg-black flex items-center justify-center flex-shrink-0 shadow-lg shadow-accent/20 overflow-hidden relative">
+                                    {videoUrl && (
+                                        <video
+                                            src={videoUrl}
+                                            className="w-full h-full object-cover"
+                                            autoPlay
+                                            muted
+                                            loop
+                                            playsInline
+                                        />
+                                    )}
+                                    <div className="absolute inset-0 bg-accent/10 pointer-events-none" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <h3 className="font-bold truncate pr-4 text-lg">{metadata?.name}</h3>
-                                        <button onClick={reset} className="p-1 hover:bg-muted/30 rounded-full transition-colors pointer-events-auto">
-                                            <X className="w-5 h-5 text-muted-foreground" />
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="font-bold truncate pr-4 text-xl tracking-tight">{metadata?.name}</h3>
+                                        <button onClick={reset} className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-full transition-all pointer-events-auto">
+                                            <X className="w-6 h-6" />
                                         </button>
                                     </div>
-                                    <div className="flex gap-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                                        <span>{metadata?.size}</span>
-                                        <span>{metadata?.duration}</span>
-                                        <span>{metadata?.resolution}</span>
+                                    <div className="flex gap-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-80">
+                                        <span className="bg-muted/20 px-2 py-0.5 rounded">{metadata?.size}</span>
+                                        <span className="bg-muted/20 px-2 py-0.5 rounded">{metadata?.duration}</span>
+                                        <span className="bg-muted/20 px-2 py-0.5 rounded">{metadata?.resolution}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <div className="flex justify-between items-end text-sm">
-                                        <span className="font-bold flex items-center gap-2">
+                            <div className="space-y-8 px-2">
+                                <div className="space-y-3">
+                                    <div className="flex justify-between items-end text-xs">
+                                        <span className="font-black uppercase tracking-widest flex items-center gap-3">
                                             {status === 'uploading' ? (
                                                 <>
                                                     <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                                                    Uploading...
+                                                    <span className="animate-pulse">Uploading...</span>
                                                 </>
                                             ) : status === 'processing' ? (
                                                 <>
                                                     <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                                                    Extracting frames & audio...
+                                                    <span className="animate-pulse">Analyzing...</span>
                                                 </>
                                             ) : (
                                                 <>
                                                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                                    Ready for analysis
+                                                    <span className="text-emerald-500">Video Verified</span>
                                                 </>
                                             )}
                                         </span>
-                                        <span className="text-muted-foreground font-mono">{Math.floor(progress)}%</span>
+                                        <span className="text-accent font-black font-mono text-base">{Math.floor(progress)}%</span>
                                     </div>
-                                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                                    <div className="h-2 w-full bg-muted/30 rounded-full overflow-hidden">
                                         <div
                                             className={cn(
-                                                "h-full transition-all duration-300 ease-out",
-                                                status === 'ready' ? "bg-emerald-500" : "bg-accent shadow-[0_0_10px_rgba(59,130,246,0.5)]"
+                                                "h-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(59,130,246,0.3)]",
+                                                status === 'ready' ? "bg-emerald-500" : "bg-accent"
                                             )}
                                             style={{ width: `${progress}%` }}
                                         />
@@ -208,17 +228,17 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete }) => {
                                 </div>
 
                                 {status === 'ready' && (
-                                    <div className="flex flex-col gap-4 animate-in slide-in-from-bottom-4 duration-500">
+                                    <div className="flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-700">
                                         <button
-                                            onClick={() => file && metadata && onUploadComplete(file, metadata)}
-                                            className="w-full py-4 bg-accent text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-accent/40 hover:scale-[1.01] active:scale-[0.99] transition-all"
+                                            onClick={() => metadata && onUploadComplete(metadata)}
+                                            className="w-full py-5 bg-accent text-white rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-2xl shadow-accent/40 hover:translate-y-[-2px] hover:shadow-accent/50 active:scale-[0.98] transition-all"
                                         >
-                                            <Play className="w-5 h-5 fill-current" />
+                                            <Play className="w-6 h-6 fill-current" />
                                             Run Compliance Analysis
                                         </button>
-                                        <p className="text-[10px] text-center text-muted-foreground font-medium uppercase tracking-[0.2em]">
-                                            All files are encrypted and processed locally
-                                        </p>
+                                        <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em]">
+                                            Local AI Engine Ready
+                                        </div>
                                     </div>
                                 )}
                             </div>
