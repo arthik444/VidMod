@@ -3,9 +3,23 @@ import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import VideoWorkspace from './VideoWorkspace';
 import RightPanel from './RightPanel';
+import UploadZone from './UploadZone';
+import type { VideoMetadata } from './UploadZone';
 
 const AppLayout: React.FC = () => {
-    const [activeTab, setActiveTab] = useState('Analysis');
+    const [activeTab, setActiveTab] = useState('Upload');
+    const [videoFile, setVideoFile] = useState<File | null>(null);
+    const [videoMetadata, setVideoMetadata] = useState<VideoMetadata | null>(null);
+    const [videoUrl, setVideoUrl] = useState<string | null>(null);
+
+    const handleUploadComplete = (file: File, metadata: VideoMetadata) => {
+        setVideoFile(file);
+        setVideoMetadata(metadata);
+        setVideoUrl(URL.createObjectURL(file));
+        setActiveTab('Analysis');
+    };
+
+    console.log('AppLayout videoFile:', videoFile); // for debugging if needed
 
     return (
         <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -17,12 +31,20 @@ const AppLayout: React.FC = () => {
                 <TopBar />
 
                 <main className="flex flex-1 overflow-hidden p-4 gap-4">
-                    <div className="flex-[3] min-w-0">
-                        <VideoWorkspace />
-                    </div>
-                    <div className="flex-1 min-w-[300px] max-w-[400px]">
-                        <RightPanel activeTab={activeTab} />
-                    </div>
+                    {activeTab === 'Upload' ? (
+                        <div className="flex-1">
+                            <UploadZone onUploadComplete={handleUploadComplete} />
+                        </div>
+                    ) : (
+                        <>
+                            <div className="flex-[3] min-w-0">
+                                <VideoWorkspace videoUrl={videoUrl || undefined} metadata={videoMetadata || undefined} />
+                            </div>
+                            <div className="flex-1 min-w-[300px] max-w-[400px]">
+                                <RightPanel activeTab={activeTab} />
+                            </div>
+                        </>
+                    )}
                 </main>
             </div>
         </div>

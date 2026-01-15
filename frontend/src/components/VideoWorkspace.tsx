@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, FileVideo } from 'lucide-react';
+import type { VideoMetadata } from './UploadZone';
 
-const VideoWorkspace: React.FC = () => {
+interface VideoWorkspaceProps {
+    videoUrl?: string;
+    metadata?: VideoMetadata;
+}
+
+const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, metadata }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress] = useState(35);
 
@@ -10,8 +16,11 @@ const VideoWorkspace: React.FC = () => {
             {/* Video Container */}
             <div className="flex-1 relative rounded-xl border border-border bg-black overflow-hidden group shadow-2xl">
                 <video
+                    key={videoUrl} // Ensure player updates when video results change
+                    src={videoUrl}
                     className="w-full h-full object-contain"
-                    poster="https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&q=80&w=1200"
+                    poster={!videoUrl ? "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&q=80&w=1200" : undefined}
+                    autoPlay={false}
                 />
 
                 {/* Play Overlay (Hidden when playing) */}
@@ -47,7 +56,7 @@ const VideoWorkspace: React.FC = () => {
                                 </button>
                                 <button className="text-white/80 hover:text-white transition-colors"><SkipForward className="w-5 h-5" /></button>
                                 <div className="text-xs font-mono text-white/60 select-none">
-                                    <span className="text-white">00:12:44</span> / 00:45:00
+                                    <span className="text-white">00:12:44</span> / {metadata?.duration || '00:45:00'}
                                 </div>
                             </div>
 
@@ -65,32 +74,59 @@ const VideoWorkspace: React.FC = () => {
                 </div>
             </div>
 
-            {/* Timeline Placeholder */}
-            <div className="h-48 border border-border bg-card/40 rounded-xl p-4 overflow-hidden relative">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Master Timeline</span>
-                    <div className="text-[10px] text-muted-foreground font-mono bg-muted/30 px-2 py-0.5 rounded">FPS: 60</div>
-                </div>
+            {/* Metadata & Timeline Area */}
+            <div className="h-48 flex gap-4 overflow-hidden">
+                {/* Simple Info Panel */}
+                {metadata && (
+                    <div className="w-64 border border-border bg-card/40 rounded-xl p-4 flex flex-col gap-3">
+                        <div className="flex items-center gap-2 pb-2 border-b border-border">
+                            <FileVideo className="w-4 h-4 text-accent" />
+                            <span className="text-xs font-bold uppercase tracking-wider">Properties</span>
+                        </div>
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground">
+                                <span>Resolution</span>
+                                <span className="text-foreground">{metadata.resolution}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground">
+                                <span>Duration</span>
+                                <span className="text-foreground">{metadata.duration}</span>
+                            </div>
+                            <div className="flex justify-between text-[10px] uppercase font-bold text-muted-foreground">
+                                <span>Size</span>
+                                <span className="text-foreground">{metadata.size}</span>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
-                {/* Mock Waveform/Tracks */}
-                <div className="flex flex-col gap-2 mt-4 opacity-50">
-                    <div className="h-8 w-full bg-blue-500/10 border border-blue-500/20 rounded-md relative overflow-hidden">
-                        <div className="absolute left-1/4 right-1/3 top-0 bottom-0 bg-accent/30 border-x border-accent/50" />
+                {/* Master Timeline */}
+                <div className="flex-1 border border-border bg-card/40 rounded-xl p-4 overflow-hidden relative">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Master Timeline</span>
+                        <div className="text-[10px] text-muted-foreground font-mono bg-muted/30 px-2 py-0.5 rounded">FPS: 60</div>
                     </div>
-                    <div className="h-8 w-full bg-green-500/10 border border-green-500/20 rounded-md relative overflow-hidden">
-                        <div className="absolute left-[10%] right-[60%] top-0 bottom-0 bg-green-500/30 border-x border-green-500/50" />
-                    </div>
-                    <div className="h-8 w-full bg-purple-500/10 border border-purple-500/20 rounded-md relative overflow-hidden">
-                        <div className="absolute left-[40%] right-[10%] top-0 bottom-0 bg-purple-500/30 border-x border-purple-500/50" />
-                    </div>
-                </div>
 
-                {/* Playhead */}
-                <div
-                    className="absolute top-0 bottom-0 w-px bg-accent z-10 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
-                    style={{ left: `calc(${progress}% + 16px)` }}
-                >
-                    <div className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-accent rotate-45" />
+                    {/* Mock Waveform/Tracks */}
+                    <div className="flex flex-col gap-2 mt-4 opacity-50">
+                        <div className="h-8 w-full bg-blue-500/10 border border-blue-500/20 rounded-md relative overflow-hidden">
+                            <div className="absolute left-1/4 right-1/3 top-0 bottom-0 bg-accent/30 border-x border-accent/50" />
+                        </div>
+                        <div className="h-8 w-full bg-green-500/10 border border-green-500/20 rounded-md relative overflow-hidden">
+                            <div className="absolute left-[10%] right-[60%] top-0 bottom-0 bg-green-500/30 border-x font-[10px] border-green-500/50" />
+                        </div>
+                        <div className="h-8 w-full bg-purple-500/10 border border-purple-500/20 rounded-md relative overflow-hidden">
+                            <div className="absolute left-[40%] right-[10%] top-0 bottom-0 bg-purple-500/30 border-x border-purple-500/50" />
+                        </div>
+                    </div>
+
+                    {/* Playhead */}
+                    <div
+                        className="absolute top-0 bottom-0 w-px bg-accent z-10 shadow-[0_0_8px_rgba(59,130,246,0.5)]"
+                        style={{ left: `calc(${progress}% + 16px)` }}
+                    >
+                        <div className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-accent rotate-45" />
+                    </div>
                 </div>
             </div>
         </div>
