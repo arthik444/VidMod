@@ -1,12 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, VolumeX } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, Maximize2, VolumeX, PencilLine } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import TimelineEditor from './TimelineEditor';
+import DrawingCanvas from './DrawingCanvas';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
+
 export interface Finding {
     id: number;
     type: string;
@@ -29,9 +31,10 @@ interface VideoWorkspaceProps {
     seekTo?: number;
     findings?: Finding[];
     onTimeUpdate?: (time: number) => void;
+    onAddFinding?: (finding: Omit<Finding, 'id'>) => void;
 }
 
-const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findings = [], onTimeUpdate }) => {
+const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findings = [], onTimeUpdate, onAddFinding }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -42,6 +45,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
     const [isDraggingScrubber, setIsDraggingScrubber] = useState(false);
     const [isDraggingVolume, setIsDraggingVolume] = useState(false);
     const [showControls, setShowControls] = useState(true);
+    const [isEditMode, setIsEditMode] = useState(false);
     const controlsTimeoutRef = useRef<any>(null);
 
     useEffect(() => {
@@ -61,15 +65,12 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
         video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('durationchange', handleDurationChange);
 
-        // Auto-play when video is loaded
         if (videoUrl) {
-            video.load(); // Explicitly load new source
+            video.load();
             video.volume = volume;
             const playPromise = video.play();
             if (playPromise !== undefined) {
-                playPromise.catch(err => {
-                    console.log('Auto-play blocked, waiting for interaction:', err);
-                });
+                playPromise.catch(err => console.log('Auto-play blocked:', err));
             }
         }
 
@@ -81,10 +82,8 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
         };
     }, [videoUrl]);
 
-    // Keyboard Shortcuts
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Only trigger if not typing in an input
             if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
 
             switch (e.code) {
@@ -102,10 +101,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
                     toggleMute();
                     break;
                 case 'KeyF':
-                    if (videoRef.current) {
-                        if (document.fullscreenElement) document.exitFullscreen();
-                        else videoRef.current.parentElement?.requestFullscreen();
-                    }
+                    toggleFullscreen();
                     break;
             }
         };
@@ -123,11 +119,8 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
 
     const togglePlay = () => {
         if (videoRef.current) {
-            if (isPlaying) {
-                videoRef.current.pause();
-            } else {
-                videoRef.current.play();
-            }
+            if (isPlaying) videoRef.current.pause();
+            else videoRef.current.play();
         }
     };
 
@@ -151,7 +144,6 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
         }
     };
 
-    // Global drag listeners
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => {
             if (isDraggingScrubber) {
@@ -180,7 +172,6 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
         };
     }, [isDraggingScrubber, isDraggingVolume, duration]);
 
-    // Auto-hide controls
     const resetControlsTimer = () => {
         setShowControls(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -199,11 +190,8 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
 
     const toggleFullscreen = () => {
         if (containerRef.current) {
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else {
-                containerRef.current.requestFullscreen();
-            }
+            if (document.fullscreenElement) document.exitFullscreen();
+            else containerRef.current.requestFullscreen();
         }
     };
 
@@ -213,11 +201,30 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
+    const handleManualEditConfirm = (box: any, action: 'blur' | 'replace' | 'mute') => {
+        if (!onAddFinding) return;
+
+        const type = action === 'blur' ? 'Manual Blur' : action === 'replace' ? 'Manual Replace' : 'Manual Mute';
+        const category = action === 'blur' || action === 'replace' ? 'logo' : 'language';
+
+        onAddFinding({
+            type,
+            category,
+            content: `User defined ${action} area`,
+            status: 'warning',
+            confidence: 'High',
+            startTime: currentTime,
+            endTime: Math.min(currentTime + 5, duration),
+            box
+        });
+
+        setIsEditMode(false);
+    };
+
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
 
     return (
         <div className="flex flex-col h-full gap-4" onMouseMove={resetControlsTimer}>
-            {/* Video Container */}
             <div
                 ref={containerRef}
                 className="flex-1 relative rounded-xl border border-border bg-black overflow-hidden group shadow-2xl"
@@ -233,10 +240,15 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
                     playsInline
                     muted={isMuted}
                     autoPlay
-                    data-testid="main-video-player"
                 />
 
-                {/* Detection Overlay Layer */}
+                {isEditMode && !isPlaying && (
+                    <DrawingCanvas
+                        onConfirm={handleManualEditConfirm}
+                        onCancel={() => setIsEditMode(false)}
+                    />
+                )}
+
                 <div className="absolute inset-0 pointer-events-none">
                     {findings.map(finding => {
                         const isActive = currentTime >= finding.startTime && currentTime <= finding.endTime;
@@ -267,8 +279,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
                     })}
                 </div>
 
-                {/* Play Overlay */}
-                {!isPlaying && videoUrl && (
+                {!isPlaying && videoUrl && !isEditMode && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] pointer-events-none">
                         <button
                             className="w-20 h-20 flex items-center justify-center rounded-full bg-accent text-white shadow-2xl scale-100 hover:scale-110 transition-transform pointer-events-auto"
@@ -279,13 +290,11 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
                     </div>
                 )}
 
-                {/* Floating Controls Bar */}
                 <div className={cn(
                     "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent transition-opacity duration-300 z-50",
                     showControls ? "opacity-100" : "opacity-0 invisible"
                 )}>
                     <div className="flex flex-col gap-3">
-                        {/* Scrubber */}
                         <div
                             id="main-scrubber"
                             className="relative h-1.5 w-full bg-white/20 rounded-full cursor-pointer group/scrub"
@@ -322,6 +331,24 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
                                 <div className="text-xs font-mono text-white select-none bg-black/50 px-2 py-1 rounded">
                                     <span className="font-bold">{formatTime(currentTime)}</span> / {formatTime(duration)}
                                 </div>
+
+                                <div className="h-4 w-[1px] bg-white/20 mx-1" />
+
+                                <button
+                                    onClick={() => {
+                                        setIsEditMode(!isEditMode);
+                                        if (isPlaying) videoRef.current?.pause();
+                                    }}
+                                    className={cn(
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                                        isEditMode
+                                            ? "bg-accent text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]"
+                                            : "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
+                                    )}
+                                >
+                                    <PencilLine className="w-4 h-4" />
+                                    {isEditMode ? 'Editing...' : 'Manual Edit'}
+                                </button>
                             </div>
 
                             <div className="flex items-center gap-4">
@@ -340,10 +367,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
                                         <div className="absolute top-0 left-0 h-full bg-white" style={{ width: `${isMuted ? 0 : volume * 100}%` }} />
                                     </div>
                                 </div>
-                                <button
-                                    onClick={toggleFullscreen}
-                                    className="text-white/80 hover:text-white transition-colors"
-                                >
+                                <button onClick={toggleFullscreen} className="text-white/80 hover:text-white transition-colors">
                                     <Maximize2 className="w-5 h-5" />
                                 </button>
                             </div>
@@ -352,16 +376,13 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
                 </div>
             </div>
 
-            {/* Master Timeline Area */}
             <div className="h-48 overflow-hidden">
                 <TimelineEditor
                     duration={duration}
                     currentTime={currentTime}
                     findings={findings}
                     onSeek={(time) => {
-                        if (videoRef.current) {
-                            videoRef.current.currentTime = time;
-                        }
+                        if (videoRef.current) videoRef.current.currentTime = time;
                     }}
                 />
             </div>

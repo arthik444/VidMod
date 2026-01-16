@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import VideoWorkspace, { type Finding } from './VideoWorkspace';
@@ -57,10 +57,22 @@ const AppLayout: React.FC = () => {
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [findings, setFindings] = useState<Finding[]>([]);
     const [currentTime, setCurrentTime] = useState(0);
-
-    // We'll use a ref to expose a seek function or similar if needed, 
-    // but for simple local interactivity, we can pass a timestamp to seek to.
     const [seekToTimestamp, setSeekToTimestamp] = useState<number | null>(null);
+    const [platform, setPlatform] = useState('YouTube');
+    const [region, setRegion] = useState('US');
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+    // Mock re-analysis when profile changes
+    useEffect(() => {
+        if (!videoUrl) return;
+
+        setIsAnalyzing(true);
+        const timer = setTimeout(() => {
+            setIsAnalyzing(false);
+        }, 1500);
+
+        return () => clearTimeout(timer);
+    }, [platform, region]);
 
     const handleFileSelected = (metadata: VideoMetadata) => {
         setVideoMetadata(metadata);
@@ -70,6 +82,11 @@ const AppLayout: React.FC = () => {
 
     const handleUploadComplete = () => {
         setFindings(MOCK_FINDINGS);
+    };
+
+    const handleAddFinding = (newFinding: Omit<Finding, 'id'>) => {
+        const id = findings.length > 0 ? Math.max(...findings.map(f => f.id)) + 1 : 1;
+        setFindings(prev => [...prev, { ...newFinding, id }]);
     };
 
     const handleSeekTo = (time: string) => {
@@ -88,7 +105,12 @@ const AppLayout: React.FC = () => {
 
             {/* Main Content Area */}
             <div className="flex flex-col flex-1 min-w-0">
-                <TopBar />
+                <TopBar
+                    platform={platform}
+                    region={region}
+                    onPlatformChange={setPlatform}
+                    onRegionChange={setRegion}
+                />
 
                 <main className="flex flex-1 overflow-hidden p-4 gap-4">
                     {activeTab === 'Upload' ? (
@@ -106,6 +128,7 @@ const AppLayout: React.FC = () => {
                                     seekTo={seekToTimestamp ?? undefined}
                                     findings={findings}
                                     onTimeUpdate={setCurrentTime}
+                                    onAddFinding={handleAddFinding}
                                 />
                             </div>
                             <div className="flex-1 min-w-[300px] max-w-[400px]">
@@ -113,6 +136,7 @@ const AppLayout: React.FC = () => {
                                     onSeekTo={handleSeekTo}
                                     findings={findings}
                                     currentTime={currentTime}
+                                    isAnalyzing={isAnalyzing}
                                 />
                             </div>
                         </>
