@@ -32,11 +32,12 @@ interface VideoWorkspaceProps {
     videoUrl?: string;
     seekTo?: number;
     findings?: Finding[];
+    jobId?: string;
     onTimeUpdate?: (time: number) => void;
     onAddFinding?: (finding: Omit<Finding, 'id'>) => void;
 }
 
-const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findings = [], onTimeUpdate, onAddFinding }) => {
+const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findings = [], jobId, onTimeUpdate, onAddFinding }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -207,16 +208,17 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    const handleManualEditConfirm = (box: any, action: 'blur' | 'replace' | 'mute') => {
+    const handleManualEditConfirm = (box: any, action: 'blur' | 'replace' | 'mute', label?: string) => {
         if (!onAddFinding) return;
 
         const type = action === 'blur' ? 'Manual Blur' : action === 'replace' ? 'Manual Replace' : 'Manual Mute';
         const category = action === 'blur' || action === 'replace' ? 'logo' : 'language';
+        const content = label ? `${action} "${label}"` : `User defined ${action} area`;
 
         onAddFinding({
             type,
             category,
-            content: `User defined ${action} area`,
+            content,
             status: 'warning',
             confidence: 'High',
             startTime: currentTime,
@@ -250,6 +252,8 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, seekTo, findi
 
                 {isEditMode && !isPlaying && (
                     <DrawingCanvas
+                        jobId={jobId || "temp-job"}
+                        currentTime={currentTime}
                         onConfirm={handleManualEditConfirm}
                         onCancel={() => setIsEditMode(false)}
                     />
