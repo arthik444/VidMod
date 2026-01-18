@@ -64,7 +64,9 @@ def get_pipeline(settings: Settings = Depends(get_settings)) -> VideoPipeline:
             base_storage_dir=settings.base_dir / "storage" / "jobs",
             keyframe_interval=settings.keyframe_interval,
             ffmpeg_path=settings.get_ffmpeg_path(),
-            ffprobe_path=settings.get_ffprobe_path()
+            ffprobe_path=settings.get_ffprobe_path(),
+            aws_bucket_name=settings.aws_s3_bucket_name if settings.aws_s3_bucket_name else None,
+            aws_region=settings.aws_region
         )
     return _pipeline
 
@@ -1255,13 +1257,33 @@ async def blur_object(
                 # Step 1: Run SAM3 on the CLIP (much faster!)
                 logger.info(f"Step 1: Creating segmentation for '{request.text_prompt}' on clip using SAM3...")
                 
+                # Simplify prompt for better SAM3 results
+                from core.prompt_simplifier import PromptSimplifier
+                try:
+                    simplifier = PromptSimplifier(api_key=pipeline.replicate_api_token)  # Reuse Replicate token for now
+                    # Check if Gemini key is available
+                    from app.config import get_settings
+                    settings = get_settings()
+                    if settings.gemini_api_key:
+                        simplifier = PromptSimplifier(api_key=settings.gemini_api_key)
+                    
+                    simplified_prompt = simplifier.simplify(request.text_prompt)
+                    logger.info(f"📝 Prompt optimized: '{request.text_prompt}' → '{simplified_prompt}'")
+                except Exception as e:
+                    logger.warning(f"Prompt simplification failed, using original: {e}")
+                    simplified_prompt = request.text_prompt
+                
                 # Call SAM3 directly on the clip
                 from core.sam3_engine import Sam3VideoEngine
                 sam3_video = Sam3VideoEngine(api_token=pipeline.replicate_api_token)
                 
+                # Use S3 URL for full video if available, otherwise use local clip path
+                # Smart Clipping will extract the relevant clip locally
+                video_source = job.s3_url if job.s3_url else clip_path
+                
                 result = sam3_video.segment_video(
-                    video_source=clip_path,  # Fixed: was 'video'
-                    prompt=request.text_prompt,  # Fixed: was 'text_prompt'
+                    video_source=video_source,  # Use S3 URL if available, else clip path
+                    prompt=simplified_prompt,  # Use simplified prompt
                     mask_only=False,
                     mask_color="green",
                     mask_opacity=1.0

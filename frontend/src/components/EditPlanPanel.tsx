@@ -167,6 +167,73 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
     const [isProcessingBatch, setIsProcessingBatch] = useState(false);
     const [batchProgress, setBatchProgress] = useState('');
 
+    // State for batch review modal
+    const [showBatchReviewModal, setShowBatchReviewModal] = useState(false);
+
+    // Batch findings configuration (editable in modal)
+    interface BatchFindingConfig {
+        finding: Finding;
+        selected: boolean;
+        effectType: 'blur' | 'pixelate';
+        prompt: string;
+    }
+
+    const [batchConfigs, setBatchConfigs] = useState<BatchFindingConfig[]>([]);
+
+    // Initialize batch configs from findings
+    const initializeBatchConfigs = () => {
+        const configs: BatchFindingConfig[] = findings.map(f => ({
+            finding: f,
+            selected: true, // All selected by default
+            effectType: (f.suggestedAction?.toLowerCase().includes('pixelate') ? 'pixelate' : 'blur') as 'blur' | 'pixelate',
+            prompt: f.content
+        }));
+        setBatchConfigs(configs);
+        setShowBatchReviewModal(true);
+    };
+
+    // Process selected findings
+    const processBatchFindings = async () => {
+        const selected = batchConfigs.filter(c => c.selected);
+        if (selected.length === 0 || !jobId) return;
+
+        setShowBatchReviewModal(false);
+        setIsProcessingBatch(true);
+        setBatchProgress(`Starting batch process for ${selected.length} findings...`);
+
+        try {
+            for (let i = 0; i < selected.length; i++) {
+                const config = selected[i];
+                const shortPrompt = config.prompt.substring(0, 60) + (config.prompt.length > 60 ? '...' : '');
+
+                setBatchProgress(`Processing ${i + 1}/${selected.length}: ${shortPrompt}`);
+
+                // Import blurObject from api
+                const { blurObject } = await import('../services/api');
+
+                await blurObject(
+                    jobId,
+                    config.prompt,
+                    30,
+                    config.effectType,
+                    config.finding.startTime,
+                    config.finding.endTime
+                );
+            }
+
+            setBatchProgress(`✅ Successfully processed ${selected.length} findings!`);
+            onActionComplete?.('batch-findings', { count: selected.length });
+
+        } catch (error: any) {
+            setBatchProgress(`❌ Error: ${error.message}`);
+        } finally {
+            setTimeout(() => {
+                setIsProcessingBatch(false);
+                setBatchProgress('');
+            }, 3000);
+        }
+    };
+
     // Apply All - process queue grouped by effect type
     const handleApplyAll = async () => {
         if (customObjects.length === 0 || !jobId) return;
@@ -552,6 +619,33 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                         );
                     })
                 )}
+
+                {/* Process All Findings Button */}
+                {steps.length > 0 && jobId && (
+                    <div className="mt-6 mb-4">
+                        <button
+                            onClick={initializeBatchConfigs}
+                            disabled={isProcessingBatch}
+                            className="w-full py-3 bg-gradient-to-r from-accent via-purple-600 to-pink-600 hover:from-accent/90 hover:via-purple-600/90 hover:to-pink-600/90 text-white rounded-xl font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                        >
+                            {isProcessingBatch ? (
+                                <>
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    Processing...
+                                </>
+                            ) : (
+                                <>
+                                    🚀 Process All Findings ({steps.length} items)
+                                </>
+                            )}
+                        </button>
+                        {batchProgress && (
+                            <p className={`text-sm mt-2 text-center font-medium ${batchProgress.includes('Error') || batchProgress.includes('❌') ? 'text-red-400' : 'text-emerald-400'}`}>
+                                {batchProgress}
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
 
             <div className="p-4 border-t border-border bg-muted/5">
@@ -563,6 +657,130 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     <div className="w-full h-full bg-accent animate-pulse" />
                 </div>
             </div>
+
+
+            {/* Batch Review Modal */}
+            {showBatchReviewModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center">
+                    {/* Backdrop */}
+                    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowBatchReviewModal(false)} />
+
+                    {/* Modal */}
+                    <div className="relative z-10 w-full max-w-4xl max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-border bg-muted/20">
+                            <h2 className="font-bold text-lg flex items-center gap-2">
+                                🚀 Batch Process Findings
+                            </h2>
+                            <button onClick={() => setShowBatchReviewModal(false)} className="p-1 rounded-lg hover:bg-muted transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                            {batchConfigs.map((config, index) => (
+                                <div key={index} className={`p-4 rounded-xl border transition-all ${config.selected ? 'border-accent bg-accent/5' : 'border-border bg-muted/10'}`}>
+                                    <div className="flex items-start gap-3">
+                                        {/* Checkbox */}
+                                        <input
+                                            type="checkbox"
+                                            checked={config.selected}
+                                            onChange={(e) => {
+                                                const updated = [...batchConfigs];
+                                                updated[index].selected = e.target.checked;
+                                                setBatchConfigs(updated);
+                                            }}
+                                            className="mt-1 w-5 h-5 rounded border-2 border-accent text-accent focus:ring-2 focus:ring-accent cursor-pointer"
+                                        />
+
+                                        <div className="flex-1 space-y-3">
+                                            {/* Finding Info */}
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex-1">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="text-xs font-bold text-accent uppercase">{config.finding.type}</span>
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {Math.floor(config.finding.startTime / 60)}:{String(Math.floor(config.finding.startTime % 60)).padStart(2, '0')} - {Math.floor(config.finding.endTime / 60)}:{String(Math.floor(config.finding.endTime % 60)).padStart(2, '0')}
+                                                        </span>
+                                                    </div>
+
+                                                    {/* Editable Prompt */}
+                                                    <textarea
+                                                        value={config.prompt}
+                                                        onChange={(e) => {
+                                                            const updated = [...batchConfigs];
+                                                            updated[index].prompt = e.target.value;
+                                                            setBatchConfigs(updated);
+                                                        }}
+                                                        className="w-full px-3 py-2 text-sm bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent resize-none"
+                                                        rows={2}
+                                                        placeholder="Object description..."
+                                                    />
+                                                </div>
+
+                                                {/* Effect Type Toggle */}
+                                                <div className="flex flex-col gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            const updated = [...batchConfigs];
+                                                            updated[index].effectType = 'blur';
+                                                            setBatchConfigs(updated);
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${config.effectType === 'blur'
+                                                                ? 'bg-amber-500/20 text-amber-400 border-2 border-amber-500'
+                                                                : 'bg-muted border border-border text-muted-foreground hover:bg-muted-foreground/10'
+                                                            }`}
+                                                    >
+                                                        <EyeOff className="w-3 h-3 inline mr-1" />
+                                                        Blur
+                                                    </button>
+                                                    <button
+                                                        onClick={() => {
+                                                            const updated = [...batchConfigs];
+                                                            updated[index].effectType = 'pixelate';
+                                                            setBatchConfigs(updated);
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${config.effectType === 'pixelate'
+                                                                ? 'bg-cyan-500/20 text-cyan-400 border-2 border-cyan-500'
+                                                                : 'bg-muted border border-border text-muted-foreground hover:bg-muted-foreground/10'
+                                                            }`}
+                                                    >
+                                                        <Grid className="w-3 h-3 inline mr-1" />
+                                                        Pixelate
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-4 border-t border-border bg-muted/20 flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">
+                                {batchConfigs.filter(c => c.selected).length} of {batchConfigs.length} selected
+                            </span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setShowBatchReviewModal(false)}
+                                    className="px-4 py-2 bg-muted hover:bg-muted-foreground/20 rounded-lg font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={processBatchFindings}
+                                    disabled={batchConfigs.filter(c => c.selected).length === 0}
+                                    className="px-6 py-2 bg-gradient-to-r from-accent to-purple-600 hover:from-accent/90 hover:to-purple-600/90 text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    Process Selected ({batchConfigs.filter(c => c.selected).length})
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Action Modal */}
             {modalOpen && selectedStep && jobId && (
