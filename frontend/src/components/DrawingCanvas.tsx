@@ -18,7 +18,7 @@ interface Box {
 interface DrawingCanvasProps {
     jobId: string;
     currentTime: number;
-    onConfirm: (box: Box, action: 'blur' | 'replace' | 'mute', label?: string) => void;
+    onConfirm: (box: Box, action: 'blur' | 'replace' | 'mute', label?: string, reasoning?: string) => void;
     onCancel: () => void;
 }
 
@@ -96,7 +96,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ jobId, currentTime, onCon
 
     const handleAction = (action: 'blur' | 'replace' | 'mute', label?: string) => {
         if (currentBox) {
-            onConfirm(currentBox, action, label || analysisResult?.itemName);
+            onConfirm(currentBox, action, label || analysisResult?.itemName, analysisResult?.reasoning);
             reset();
         }
     };
@@ -199,7 +199,7 @@ const DrawingCanvas: React.FC<DrawingCanvasProps> = ({ jobId, currentTime, onCon
                                 {analysisResult?.actions.map((action) => (
                                     <button
                                         key={action.id}
-                                        onClick={() => handleAction(action.type as any)}
+                                        onClick={() => handleAction(action.type as any, action.label)}
                                         className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-accent/10 transition-all border border-transparent hover:border-accent/30 group"
                                     >
                                         <div className="flex items-center gap-3">
