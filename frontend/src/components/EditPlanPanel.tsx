@@ -380,7 +380,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
             <div className="p-4 space-y-4">
                 <div className="flex items-center justify-between">
                     <h3 className="font-bold text-xs uppercase tracking-[0.15em] text-muted-foreground">Manual Targeting</h3>
-                    <div className="px-2 py-0.5 rounded-full bg-zinc-100/10 text-zinc-100 text-[9px] font-black uppercase tracking-[0.2em] border border-white/5">
+                    <div className="px-2 py-0.5 rounded-full bg-secondary text-primary text-[9px] font-black uppercase tracking-[0.2em] border border-border">
                         Targeting Logic
                     </div>
                 </div>
@@ -411,7 +411,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                         value={customObjectInput}
                                         onChange={(e) => setCustomObjectInput(e.target.value)}
                                         placeholder="Describe object (e.g. 'red car')"
-                                        className="w-full pl-9 pr-4 py-2.5 bg-white/[0.03] border border-white/10 rounded-xl text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                        className="w-full pl-9 pr-4 py-2.5 bg-secondary/30 border border-border rounded-xl text-sm placeholder:text-muted-foreground/40 focus:outline-none focus:ring-1 focus:ring-primary/50"
                                     />
                                 </div>
 
@@ -431,7 +431,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                                 }}
                                                 disabled={action.needsJob && !jobId}
                                                 className={cn(
-                                                    "flex items-center gap-2 px-3 py-2.5 rounded-xl border border-white/5 hover:border-white/20 transition-all active:scale-95 group",
+                                                    "flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border hover:border-border transition-all active:scale-95 group",
                                                     action.bg, action.color,
                                                     action.needsJob && !jobId && "opacity-40 cursor-not-allowed"
                                                 )}
@@ -448,7 +448,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
 
                     {/* Queue display */}
                     {customObjects.length > 0 && (
-                        <div className="pt-4 border-t border-white/5 space-y-3">
+                        <div className="pt-4 border-t border-border space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Active Queue</span>
                                 <span className="text-[9px] text-primary tabular-nums font-black">{customObjects.length}</span>
@@ -466,7 +466,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                         )}
                                     >
                                         <span>{obj.name}</span>
-                                        <button onClick={() => removeCustomObject(obj.id)} className="hover:text-white transition-colors">
+                                        <button onClick={() => removeCustomObject(obj.id)} className="hover:text-primary transition-colors">
                                             <X className="w-3 h-3" />
                                         </button>
                                     </motion.div>
@@ -476,11 +476,11 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                             <button
                                 onClick={handleApplyAll}
                                 disabled={isProcessingBatch || !jobId}
-                                className="w-full py-3 bg-zinc-100 text-zinc-950 rounded-lg hover:bg-white transition-all active:scale-[0.98] disabled:opacity-20 disabled:scale-100 flex items-center justify-center gap-2 overflow-hidden relative"
+                                className="w-full py-3 bg-primary text-primary-foreground rounded-lg hover:brightness-105 transition-all active:scale-[0.98] disabled:opacity-20 disabled:scale-100 flex items-center justify-center gap-2 overflow-hidden relative"
                             >
                                 {isProcessingBatch ? (
                                     <>
-                                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        <div className="w-3.5 h-3.5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
                                         <span className="text-[10px] uppercase font-black tracking-widest">Authorizing...</span>
                                     </>
                                 ) : (
@@ -491,7 +491,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                 )}
                                 {isProcessingBatch && (
                                     <motion.div
-                                        className="absolute bottom-0 left-0 h-0.5 bg-white/40"
+                                        className="absolute bottom-0 left-0 h-0.5 bg-primary-foreground/40"
                                         initial={{ width: 0 }}
                                         animate={{ width: '100%' }}
                                         transition={{ duration: 2 }}
@@ -624,7 +624,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                         <button
                             onClick={initializeBatchConfigs}
                             disabled={isProcessingBatch}
-                            className="w-full py-3.5 bg-zinc-900 hover:bg-zinc-800 border border-white/10 text-zinc-100 rounded-lg font-black text-[10px] uppercase tracking-[0.3em] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-2xl"
+                            className="w-full py-3.5 bg-secondary hover:brightness-110 border border-border text-primary rounded-lg font-black text-[10px] uppercase tracking-[0.3em] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-2xl"
                         >
                             {isProcessingBatch ? (
                                 <>
@@ -650,7 +650,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                 )}
             </div>
 
-            <div className="p-4 mt-auto border-t border-border bg-white/[0.01]">
+            <div className="p-4 mt-auto border-t border-border bg-secondary/10">
                 <div className="flex items-center justify-between mb-2">
                     <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Workflow Engine</span>
                     <span className="text-[9px] text-emerald-400 font-bold uppercase tabular-nums">Integrity Validated</span>
@@ -675,12 +675,12 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     {/* Modal */}
                     <div className="relative z-10 w-full max-w-4xl max-h-[90vh] bg-card border border-border rounded-2xl shadow-2xl overflow-hidden flex flex-col">
                         {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-border bg-zinc-900/50">
+                        <div className="flex items-center justify-between p-4 border-b border-border bg-secondary/80">
                             <h2 className="font-black text-xs uppercase tracking-[0.2em] flex items-center gap-3">
-                                <ShieldCheck className="w-4 h-4 text-zinc-100" />
+                                <ShieldCheck className="w-4 h-4 text-primary" />
                                 Review Batch Configuration
                             </h2>
-                            <button onClick={() => setShowBatchReviewModal(false)} className="p-1 rounded-lg hover:bg-white/10 transition-colors">
+                            <button onClick={() => setShowBatchReviewModal(false)} className="p-1 rounded-lg hover:bg-secondary transition-colors">
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
@@ -828,7 +828,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                 <button
                                     onClick={processBatchFindings}
                                     disabled={batchConfigs.filter(c => c.selected).length === 0}
-                                    className="px-6 py-2 bg-gradient-to-r from-accent to-purple-600 hover:from-accent/90 hover:to-purple-600/90 text-white rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-6 py-2 bg-gradient-to-r from-accent to-purple-600 hover:brightness-110 text-primary rounded-lg font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     Process Selected ({batchConfigs.filter(c => c.selected).length})
                                 </button>

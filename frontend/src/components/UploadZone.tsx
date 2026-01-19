@@ -177,11 +177,11 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                     {status === 'idle' && (
                         <>
                             <div
-                                className="w-16 h-16 rounded-2xl bg-zinc-900 border border-white/10 flex items-center justify-center mb-8 shadow-2xl relative group cursor-pointer hover:bg-zinc-800 transition-all"
+                                className="w-16 h-16 rounded-2xl bg-secondary/50 border border-border flex items-center justify-center mb-8 shadow-2xl relative group cursor-pointer hover:bg-secondary transition-all"
                                 onClick={() => fileInputRef.current?.click()}
                             >
-                                <UploadIcon className="w-5 h-5 text-zinc-100" />
-                                <div className="absolute inset-0 rounded-2xl border border-white/5 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-105" />
+                                <UploadIcon className="w-5 h-5 text-primary" />
+                                <div className="absolute inset-0 rounded-2xl border border-primary/20 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-105" />
                             </div>
                             <div className="text-center space-y-8 z-10">
                                 <div className="space-y-2">
@@ -191,7 +191,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                                 <div className="flex flex-col gap-4 items-center">
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="px-8 py-3 bg-zinc-100 text-zinc-950 rounded-lg font-black text-[10px] tracking-[0.3em] shadow-xl hover:bg-white transition-all active:scale-95 uppercase"
+                                        className="px-8 py-3 bg-primary text-primary-foreground rounded-lg font-black text-[10px] tracking-[0.3em] shadow-xl hover:brightness-105 transition-all active:scale-95 uppercase"
                                     >
                                         BROWSE SOURCE
                                     </button>
@@ -206,7 +206,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                                 </div>
                                 <div className="flex gap-8 justify-center items-center mt-12 opacity-20">
                                     <span className="text-[9px] font-black uppercase tracking-[0.2em]">MAX 120S</span>
-                                    <div className="w-[1px] h-3 bg-white" />
+                                    <div className="w-[1px] h-3 bg-border" />
                                     <span className="text-[9px] font-black uppercase tracking-[0.2em]">MP4 / MOV</span>
                                 </div>
                             </div>
@@ -257,8 +257,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                                             </div>
                                             <span className="text-xs font-black font-mono text-foreground opacity-50">{Math.floor(progress)}%</span>
                                         </div>
-                                        <div className="h-0.5 w-full bg-white/5 rounded-full overflow-hidden">
-                                            <div className="h-full bg-white transition-all duration-300" style={{ width: `${progress}%` }} />
+                                        <div className="h-0.5 w-full bg-secondary rounded-full overflow-hidden">
+                                            <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
                                         </div>
                                     </div>
                                 ) : (
@@ -294,8 +294,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                                                 onClick={() => metadata && onUploadComplete(metadata)}
                                                 disabled={!metadata}
                                                 className={cn(
-                                                    "w-full py-4 text-zinc-950 rounded-lg font-black text-[10px] tracking-[0.4em] transition-all relative overflow-hidden group/btn uppercase",
-                                                    metadata ? "bg-zinc-100 hover:bg-white active:scale-[0.99] shadow-lg shadow-white/5" : "bg-zinc-800 cursor-not-allowed opacity-20"
+                                                    "w-full py-4 text-primary-foreground rounded-lg font-black text-[10px] tracking-[0.4em] transition-all relative overflow-hidden group/btn uppercase",
+                                                    metadata ? "bg-primary hover:brightness-105 active:scale-[0.99] shadow-lg shadow-white/5" : "bg-muted cursor-not-allowed opacity-20"
                                                 )}
                                             >
                                                 EXECUTE COMPLIANCE SCAN
