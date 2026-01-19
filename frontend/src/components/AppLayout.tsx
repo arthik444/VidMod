@@ -4,8 +4,8 @@ import TopBar from './TopBar';
 import VideoWorkspace, { type Finding } from './VideoWorkspace';
 import RightPanel from './RightPanel';
 import UploadZone, { type VideoMetadata } from './UploadZone';
+import { resolvePolicy } from '../services/policyEngine';
 import { VideoLibrary } from './VideoLibrary';
-import { Eye, EyeOff } from 'lucide-react';
 
 // Edit version interface for tracking history
 export interface EditVersion {
@@ -28,7 +28,8 @@ const AppLayout: React.FC = () => {
     const [currentTime, setCurrentTime] = useState(0);
     const [seekToTimestamp, setSeekToTimestamp] = useState<number | null>(null);
     const [platform, setPlatform] = useState('YouTube');
-    const [region, setRegion] = useState('US');
+    const [region, setRegion] = useState('Middle East');
+    const [rating, setRating] = useState('Teens (PG-13)');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [jobId, setJobId] = useState<string | null>(null);  // Job ID for API actions
 
@@ -65,7 +66,7 @@ const AppLayout: React.FC = () => {
         }, 1500);
 
         return () => clearTimeout(timer);
-    }, [platform, region]);
+    }, [platform, region, rating]);
 
     const handleFileSelected = (metadata: VideoMetadata) => {
         setVideoMetadata(metadata);
@@ -229,7 +230,7 @@ const AppLayout: React.FC = () => {
     const [rightPanelWidth, setRightPanelWidth] = useState(380);
     const [isResizing, setIsResizing] = useState(false);
 
-    const startResizing = useCallback((mouseDownEvent: React.MouseEvent) => {
+    const startResizing = useCallback(() => {
         setIsResizing(true);
     }, []);
 
@@ -255,24 +256,38 @@ const AppLayout: React.FC = () => {
         };
     }, [resize, stopResizing]);
 
+    const activePolicy = resolvePolicy(platform, rating, region);
+
     return (
         <div className={`flex h-screen w-full overflow-hidden bg-background text-foreground ${isResizing ? 'cursor-col-resize select-none' : ''}`}>
             {/* Sidebar - Fixed width */}
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} metadata={videoMetadata} />
+            <Sidebar
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                metadata={videoMetadata}
+                policy={activePolicy}
+            />
 
             {/* Main Content Area */}
             <div className="flex flex-col flex-1 min-w-0">
                 <TopBar
                     platform={platform}
                     region={region}
-                    onPlatformChange={setPlatform}
-                    onRegionChange={setRegion}
+                    rating={rating}
+                    isAnalyzing={isAnalyzing}
+                    hasVideo={!!originalVideoUrl}
                 />
 
                 <main className="flex flex-1 overflow-hidden relative">
                     {activeTab === 'Upload' ? (
                         <div className="flex-1 p-4">
                             <UploadZone
+                                platform={platform}
+                                region={region}
+                                rating={rating}
+                                onPlatformChange={setPlatform}
+                                onRegionChange={setRegion}
+                                onRatingChange={setRating}
                                 onUploadComplete={handleUploadComplete}
                                 onFileSelected={handleFileSelected}
                                 onBrowseLibrary={() => setShowVideoLibrary(true)}
