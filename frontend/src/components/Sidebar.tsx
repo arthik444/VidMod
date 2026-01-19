@@ -64,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata, po
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-[0.15em] transition-all group",
+                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-[0.15em] transition-all group cursor-pointer",
                                 activeTab === item.id
                                     ? "bg-zinc-100 text-zinc-950 shadow-lg"
                                     : "text-zinc-500 hover:bg-white/5 hover:text-zinc-100"
@@ -84,7 +84,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata, po
                     <div className="space-y-3">
                         <button
                             onClick={() => setShowPolicies(!showPolicies)}
-                            className="w-full flex items-center justify-between text-muted-foreground hover:text-foreground transition-colors"
+                            className="w-full flex items-center justify-between text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                         >
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="w-3.5 h-3.5" />
@@ -140,7 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata, po
                         </div>
                     </div>
                 )}
-                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors">
+                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors cursor-pointer">
                     <Settings className="w-4 h-4" />
                     Settings
                 </button>

@@ -390,7 +390,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Target Object</span>
                         <button
                             onClick={() => setShowCustomInput(!showCustomInput)}
-                            className="text-primary hover:text-primary/80 transition-colors"
+                            className="text-primary hover:text-primary/80 transition-colors cursor-pointer"
                         >
                             {showCustomInput ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                         </button>
@@ -431,7 +431,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                                 }}
                                                 disabled={action.needsJob && !jobId}
                                                 className={cn(
-                                                    "flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border hover:border-border transition-all active:scale-95 group",
+                                                    "flex items-center gap-2 px-3 py-2.5 rounded-xl border border-border hover:border-border transition-all active:scale-95 group cursor-pointer",
                                                     action.bg, action.color,
                                                     action.needsJob && !jobId && "opacity-40 cursor-not-allowed"
                                                 )}
@@ -466,7 +466,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                         )}
                                     >
                                         <span>{obj.name}</span>
-                                        <button onClick={() => removeCustomObject(obj.id)} className="hover:text-primary transition-colors">
+                                        <button onClick={() => removeCustomObject(obj.id)} className="hover:text-primary transition-colors cursor-pointer">
                                             <X className="w-3 h-3" />
                                         </button>
                                     </motion.div>
@@ -476,7 +476,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                             <button
                                 onClick={handleApplyAll}
                                 disabled={isProcessingBatch || !jobId}
-                                className="w-full py-3 bg-primary text-primary-foreground rounded-lg hover:brightness-105 transition-all active:scale-[0.98] disabled:opacity-20 disabled:scale-100 flex items-center justify-center gap-2 overflow-hidden relative"
+                                className="w-full py-3 bg-primary text-primary-foreground rounded-lg hover:brightness-105 transition-all active:scale-[0.98] disabled:opacity-20 disabled:scale-100 flex items-center justify-center gap-2 overflow-hidden relative cursor-pointer"
                             >
                                 {isProcessingBatch ? (
                                     <>
@@ -624,7 +624,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                         <button
                             onClick={initializeBatchConfigs}
                             disabled={isProcessingBatch}
-                            className="w-full py-3.5 bg-secondary hover:brightness-110 border border-border text-primary rounded-lg font-black text-[10px] uppercase tracking-[0.3em] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-2xl"
+                            className="w-full py-3.5 bg-secondary hover:brightness-110 border border-border text-primary rounded-lg font-black text-[10px] uppercase tracking-[0.3em] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-2xl cursor-pointer"
                         >
                             {isProcessingBatch ? (
                                 <>

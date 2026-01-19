@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload as UploadIcon, X, CheckCircle2, Loader2, Check, ChevronDown, Video } from 'lucide-react';
+import { Upload as UploadIcon, X, Loader2, Check, ChevronDown, Video } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Platform, Region, Rating } from '../services/policyEngine';
@@ -91,8 +91,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                     resolve({
                         name: selectedFile.name,
                         size: (selectedFile.size / (1024 * 1024)).toFixed(2) + ' MB',
-                        duration: `${Math.floor(video.duration)}s`,
-                        resolution: `${video.videoWidth}x${video.videoHeight}`,
+                        duration: `${Math.floor(video.duration)} s`,
+                        resolution: `${video.videoWidth}x${video.videoHeight} `,
                         url: url,
                         file: selectedFile
                     });
@@ -131,7 +131,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
             });
 
             setProgress(50);
-            if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+            if (!response.ok) throw new Error(`Upload failed: ${response.statusText} `);
 
             const data = await response.json();
             return data.job_id;
@@ -191,14 +191,14 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                                 <div className="flex flex-col gap-4 items-center">
                                     <button
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="px-8 py-3 bg-primary text-primary-foreground rounded-lg font-black text-[10px] tracking-[0.3em] shadow-xl hover:brightness-105 transition-all active:scale-95 uppercase"
+                                        className="px-8 py-3 bg-primary text-primary-foreground rounded-lg font-black text-[10px] tracking-[0.3em] shadow-xl hover:brightness-105 transition-all active:scale-95 uppercase cursor-pointer"
                                     >
                                         BROWSE SOURCE
                                     </button>
                                     {onBrowseLibrary && (
                                         <button
                                             onClick={onBrowseLibrary}
-                                            className="text-[10px] font-black text-muted-foreground hover:text-foreground transition-all tracking-[0.2em] uppercase opacity-30 hover:opacity-100"
+                                            className="text-[10px] font-black text-muted-foreground hover:text-foreground transition-all tracking-[0.2em] uppercase opacity-30 hover:opacity-100 cursor-pointer"
                                         >
                                             Library Search
                                         </button>
@@ -224,7 +224,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                         <div className="w-full h-full flex flex-col z-10">
                             {/* Compact Video Info */}
                             <div className="flex items-center gap-6 p-6 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-3xl mb-8 transition-all">
-                                <div className="w-32 h-20 rounded-xl bg-black flex items-center justify-center flex-shrink-0 shadow-2xl overflow-hidden border border-white/5 group/preview relative">
+                                <div className="w-32 h-20 rounded-xl bg-black flex items-center justify-center flex-shrink-0 shadow-2xl overflow-hidden border border-white/5 group/preview relative cursor-pointer">
                                     {videoUrl && (
                                         <video src={videoUrl} className="w-full h-full object-cover opacity-60 group-hover/preview:opacity-100 transition-opacity" autoPlay muted loop playsInline />
                                     )}
@@ -232,7 +232,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-3">
                                         <h3 className="font-black truncate pr-4 text-lg tracking-tight text-foreground/80">{metadata?.name}</h3>
-                                        <button onClick={reset} className="p-2 hover:bg-white/10 text-muted-foreground hover:text-foreground rounded-lg transition-all">
+                                        <button onClick={reset} className="p-2 hover:bg-white/10 text-muted-foreground hover:text-foreground rounded-lg transition-all cursor-pointer">
                                             <X className="w-4 h-4" />
                                         </button>
                                     </div>
@@ -258,7 +258,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                                             <span className="text-xs font-black font-mono text-foreground opacity-50">{Math.floor(progress)}%</span>
                                         </div>
                                         <div className="h-0.5 w-full bg-secondary rounded-full overflow-hidden">
-                                            <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
+                                            <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}% ` }} />
                                         </div>
                                     </div>
                                 ) : (

@@ -119,7 +119,7 @@ const TimelineEditor: React.FC<TimelineEditorProps> = ({ duration, currentTime, 
             >
                 <div
                     ref={timelineRef}
-                    className="relative h-full min-w-full"
+                    className="relative h-full min-w-full cursor-pointer"
                     style={{ width: `${timelineWidth}%`, minHeight: '120px' }}
                     onMouseDown={handleMouseDown}
                 >

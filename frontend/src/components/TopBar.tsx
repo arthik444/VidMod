@@ -57,12 +57,12 @@ const TopBar: React.FC<TopBarProps> = ({
                     </div>
                 )}
 
-                <button className="p-2 mr-1 rounded-full hover:bg-muted/30 text-muted-foreground hover:text-foreground relative">
+                <button className="p-2 mr-1 rounded-full hover:bg-muted/30 text-muted-foreground hover:text-foreground relative cursor-pointer">
                     <Bell className="w-5 h-5" />
                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-card" />
                 </button>
 
-                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-100 text-zinc-950 text-[10px] font-black hover:bg-white transition-all uppercase tracking-[0.2em]">
+                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-100 text-zinc-950 text-[10px] font-black hover:bg-white transition-all uppercase tracking-[0.2em] cursor-pointer">
                     <Download className="w-3.5 h-3.5" />
                     Export
                 </button>

@@ -109,7 +109,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                 key={tab.id}
                                 onClick={() => setActivePanel(tab.id)}
                                 className={cn(
-                                    "flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all rounded-t-lg relative group",
+                                    "flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all rounded-t-lg relative group cursor-pointer",
                                     isActive ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                                 )}
                             >
@@ -266,7 +266,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
 
                         {/* Footer Action */}
                         <div className="p-4 border-t border-border bg-secondary/20 mt-auto">
-                            <button className="w-full flex items-center justify-center gap-3 py-3 bg-secondary hover:brightness-110 border border-border rounded-lg transition-all group">
+                            <button className="w-full flex items-center justify-center gap-3 py-3 bg-secondary hover:brightness-110 border border-border rounded-lg transition-all group cursor-pointer">
                                 <Download className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:-translate-y-0.5 transition-all" />
                                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground group-hover:text-primary">Export Analysis Data</span>
                             </button>
@@ -349,7 +349,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => onPreviewVersion?.(version.version)}
-                                                        className="p-2.5 rounded-xl glass-panel hover:bg-white/10 text-primary transition-all active:scale-90"
+                                                        className="p-2.5 rounded-xl glass-panel hover:bg-white/10 text-primary transition-all active:scale-90 cursor-pointer"
                                                         title="Stream this version"
                                                     >
                                                         <Eye className="w-4 h-4" />
@@ -357,7 +357,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                                     <a
                                                         href={version.downloadUrl.split('?')[0]}
                                                         download={`vidmod_v${version.version}.mp4`}
-                                                        className="p-2.5 rounded-xl glass-panel hover:bg-emerald-400/10 text-emerald-400 transition-all active:scale-90"
+                                                        className="p-2.5 rounded-xl glass-panel hover:bg-emerald-400/10 text-emerald-400 transition-all active:scale-90 cursor-pointer"
                                                         title="Export Secure Media"
                                                     >
                                                         <Download className="w-4 h-4" />
