@@ -50,8 +50,10 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
     const [isDraggingVolume, setIsDraggingVolume] = useState(false);
     const [showControls, setShowControls] = useState(true);
     const [isEditMode, setIsEditMode] = useState(false);
+    const [videoDimensions, setVideoDimensions] = useState({ width: 0, height: 0 });
     const [showOverlays, setShowOverlays] = useState(true);
     const controlsTimeoutRef = useRef<any>(null);
+    const resizeObserverRef = useRef<ResizeObserver | null>(null);
 
 
 
@@ -85,11 +87,26 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
             }
         }
 
+        // Initialize ResizeObserver for the video element
+        const updateDimensions = () => {
+            if (video) {
+                setVideoDimensions({
+                    width: video.clientWidth,
+                    height: video.clientHeight
+                });
+            }
+        };
+
+        resizeObserverRef.current = new ResizeObserver(updateDimensions);
+        resizeObserverRef.current.observe(video);
+        updateDimensions();
+
         return () => {
             video.removeEventListener('play', handlePlay);
             video.removeEventListener('pause', handlePause);
             video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('durationchange', handleDurationChange);
+            resizeObserverRef.current?.disconnect();
         };
     }, [videoUrl]);
 
@@ -244,61 +261,80 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                 ref={containerRef}
                 className="flex-1 relative rounded-xl border border-border bg-black overflow-hidden group shadow-2xl"
             >
-                <video
-                    ref={videoRef}
-                    src={videoUrl}
-                    key={videoUrl}
-                    className="w-full h-full object-contain cursor-pointer"
-                    poster={!videoUrl ? "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&q=80&w=1200" : undefined}
-                    onClick={togglePlay}
-                    onDoubleClick={toggleFullscreen}
-                    playsInline
-                    muted={isMuted}
-                    autoPlay
-                />
-
-                {isEditMode && !isPlaying && (
-                    <DrawingCanvas
-                        jobId={jobId || "temp-job"}
-                        currentTime={currentTime}
-                        onConfirm={handleManualEditConfirm}
-                        onCancel={() => setIsEditMode(false)}
+                <div
+                    className="w-full h-full flex items-center justify-center bg-black"
+                    style={{ position: 'relative' }}
+                >
+                    <video
+                        ref={videoRef}
+                        key={videoUrl}
+                        src={videoUrl}
+                        className="max-w-full max-h-full object-contain cursor-pointer"
+                        poster={!videoUrl ? "https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&q=80&w=1200" : undefined}
+                        onClick={togglePlay}
+                        onDoubleClick={toggleFullscreen}
+                        playsInline
+                        muted={isMuted}
+                        autoPlay
                     />
-                )}
 
+                    {isEditMode && !isPlaying && (
+                        <div className="absolute inset-0 pointer-events-auto">
+                            <DrawingCanvas
+                                jobId={jobId || "temp-job"}
+                                currentTime={currentTime}
+                                onConfirm={handleManualEditConfirm}
+                                onCancel={() => setIsEditMode(false)}
+                            />
+                        </div>
+                    )}
 
-                {/* Bounding box overlays - toggle with Eye button */}
-                {showOverlays && (
-                    <div className="absolute inset-0 pointer-events-none">
-                        {findings.map(finding => {
-                            const isActive = currentTime >= finding.startTime && currentTime <= finding.endTime;
-                            if (!isActive || !finding.box) return null;
+                    {/* Overlay Container - now properly constrained to video aspect ratio */}
+                    <div
+                        id="video-overlay"
+                        className="absolute pointer-events-none"
+                        style={{
+                            width: `${videoDimensions.width}px`,
+                            height: `${videoDimensions.height}px`,
+                            left: '50%',
+                            top: '50%',
+                            transform: 'translate(-50%, -50%)'
+                        }}
+                    >
+                        {/* Bounding box overlays - toggle with Eye button */}
+                        {showOverlays && (
+                            <div className="absolute inset-0 pointer-events-none">
+                                {findings.map(finding => {
+                                    const isActive = currentTime >= finding.startTime && currentTime <= finding.endTime;
+                                    if (!isActive || !finding.box) return null;
 
-                            return (
-                                <div
-                                    key={finding.id}
-                                    className={cn(
-                                        "absolute border-2 rounded transition-opacity duration-200",
-                                        finding.status === 'critical' ? "border-red-500 bg-red-500/10" : "border-amber-500 bg-amber-500/10"
-                                    )}
-                                    style={{
-                                        top: `${finding.box.top}%`,
-                                        left: `${finding.box.left}%`,
-                                        width: `${finding.box.width}%`,
-                                        height: `${finding.box.height}%`
-                                    }}
-                                >
-                                    <div className={cn(
-                                        "absolute -top-6 left-0 px-2 py-0.5 rounded text-[10px] font-bold text-white whitespace-nowrap uppercase tracking-wider shadow-lg",
-                                        finding.status === 'critical' ? "bg-red-500" : "bg-amber-500"
-                                    )}>
-                                        {finding.type}: {finding.content}
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                    return (
+                                        <div
+                                            key={finding.id}
+                                            className={cn(
+                                                "absolute border-2 rounded transition-opacity duration-200",
+                                                finding.status === 'critical' ? "border-red-500 bg-red-500/10" : "border-amber-500 bg-amber-500/10"
+                                            )}
+                                            style={{
+                                                top: `${finding.box.top}%`,
+                                                left: `${finding.box.left}%`,
+                                                width: `${finding.box.width}%`,
+                                                height: `${finding.box.height}%`
+                                            }}
+                                        >
+                                            <div className={cn(
+                                                "absolute -top-6 left-0 px-2 py-0.5 rounded text-[10px] font-bold text-white whitespace-nowrap uppercase tracking-wider shadow-lg",
+                                                finding.status === 'critical' ? "bg-red-500" : "bg-amber-500"
+                                            )}>
+                                                {finding.type}: {finding.content}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
-                )}
+                </div>
 
                 {!isPlaying && videoUrl && !isEditMode && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] pointer-events-none">
