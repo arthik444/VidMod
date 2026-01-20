@@ -1,16 +1,23 @@
 import React, { useState, useRef } from 'react';
-import { Upload as UploadIcon, X, CheckCircle2, Loader2, Play } from 'lucide-react';
+import { Upload as UploadIcon, X, Loader2, Check, ChevronDown, Video } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { Platform, Region, Rating } from '../services/policyEngine';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
 interface UploadZoneProps {
+    platform: string;
+    region: string;
+    rating: string;
+    onPlatformChange: (platform: string) => void;
+    onRegionChange: (region: string) => void;
+    onRatingChange: (rating: string) => void;
     onUploadComplete: (metadata: VideoMetadata) => void;
     onFileSelected: (metadata: VideoMetadata) => void;
-    onBrowseLibrary?: () => void;  // New: Open video library
+    onBrowseLibrary?: () => void;
 }
 
 export interface VideoMetadata {
@@ -20,10 +27,24 @@ export interface VideoMetadata {
     resolution: string;
     url: string;
     file: File;
-    jobId?: string;  // Added for backend upload
+    jobId?: string;
 }
 
-const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelected, onBrowseLibrary }) => {
+const platforms = Object.values(Platform);
+const regions = Object.values(Region);
+const ratings = Object.values(Rating);
+
+const UploadZone: React.FC<UploadZoneProps> = ({
+    platform,
+    region,
+    rating,
+    onPlatformChange,
+    onRegionChange,
+    onRatingChange,
+    onUploadComplete,
+    onFileSelected,
+    onBrowseLibrary
+}) => {
     const [isDragging, setIsDragging] = useState(false);
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
     const [status, setStatus] = useState<'idle' | 'uploading' | 'processing' | 'ready'>('idle');
@@ -63,7 +84,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelecte
         setProgress(0);
 
         try {
-            // 1. Start metadata extraction in parallel
             const metadataPromise = new Promise<VideoMetadata>((resolve) => {
                 const video = document.createElement('video');
                 video.preload = 'metadata';
@@ -71,8 +91,8 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelecte
                     resolve({
                         name: selectedFile.name,
                         size: (selectedFile.size / (1024 * 1024)).toFixed(2) + ' MB',
-                        duration: `${Math.floor(video.duration)}s`,
-                        resolution: `${video.videoWidth}x${video.videoHeight}`,
+                        duration: `${Math.floor(video.duration)} s`,
+                        resolution: `${video.videoWidth}x${video.videoHeight} `,
                         url: url,
                         file: selectedFile
                     });
@@ -80,10 +100,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelecte
                 video.src = url;
             });
 
-            // 2. Start upload
             const jobIdPromise = uploadToBackend(selectedFile);
-
-            // 3. Wait for both
             const [baseMetadata, jobId] = await Promise.all([metadataPromise, jobIdPromise]);
 
             if (jobId) {
@@ -114,7 +131,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelecte
             });
 
             setProgress(50);
-            if (!response.ok) throw new Error(`Upload failed: ${response.statusText}`);
+            if (!response.ok) throw new Error(`Upload failed: ${response.statusText} `);
 
             const data = await response.json();
             return data.job_id;
@@ -123,7 +140,6 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelecte
             return null;
         }
     };
-
 
     const reset = () => {
         if (videoUrl) URL.revokeObjectURL(videoUrl);
@@ -134,11 +150,15 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelecte
     };
 
     return (
-        <div className="h-full flex flex-col items-center justify-center p-8 bg-background">
-            <div className="w-full max-w-2xl">
-                <div className="mb-8 text-center animate-in fade-in slide-in-from-top-4 duration-700">
-                    <h1 className="text-3xl font-bold mb-2 tracking-tight">Upload Video for Analysis</h1>
-                    <p className="text-muted-foreground">Zenith Sensor automatically detects compliance violations locally.</p>
+        <div className="h-full flex flex-col items-center justify-center p-6 bg-background">
+            <div className="w-full max-w-4xl">
+                <div className="mb-10 text-center animate-in fade-in slide-in-from-top-4 duration-700">
+                    <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full border border-white/10 bg-white/5 mb-4">
+                        <Video className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Compliance Engine v4</span>
+                    </div>
+                    <h1 className="text-4xl font-black mb-2 tracking-tighter text-foreground uppercase">Compliance AI</h1>
+                    <p className="text-muted-foreground font-bold text-[10px] uppercase tracking-[0.1em] max-w-sm mx-auto leading-relaxed opacity-40">Systematic verification for global broadcasting standards.</p>
                 </div>
 
                 <div
@@ -146,38 +166,48 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelecte
                     onDragLeave={handleDragLeave}
                     onDrop={handleDrop}
                     className={cn(
-                        "relative rounded-3xl border-2 border-dashed transition-all duration-500 flex flex-col items-center justify-center p-12 min-h-[450px] bg-card/20 backdrop-blur-sm",
-                        isDragging ? "border-accent bg-accent/10 scale-[1.02] shadow-[0_0_40px_rgba(59,130,246,0.1)]" : "border-border hover:border-accent/40 hover:bg-card/40",
-                        status !== 'idle' && "border-solid border-border-muted"
+                        "relative rounded-[2rem] border border-white/5 transition-all duration-500 flex flex-col items-center justify-center p-8 min-h-[480px] overflow-hidden bg-card/20 backdrop-blur-xl shadow-2xl",
+                        isDragging ? "border-white/20 bg-white/5 scale-[1.002]" : "hover:border-white/10",
+                        status !== 'idle' && "border-white/5 p-6"
                     )}
                 >
+                    {/* Minimal Overlay Pattern */}
+                    <div className="absolute inset-0 opacity-[0.01] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
+
                     {status === 'idle' && (
                         <>
-                            <div className="w-24 h-24 rounded-full bg-accent/10 flex items-center justify-center mb-8 group-hover:scale-110 transition-all duration-500 shadow-inner">
-                                <UploadIcon className="w-10 h-10 text-accent" />
+                            <div
+                                className="w-16 h-16 rounded-2xl bg-secondary/50 border border-border flex items-center justify-center mb-8 shadow-2xl relative group cursor-pointer hover:bg-secondary transition-all"
+                                onClick={() => fileInputRef.current?.click()}
+                            >
+                                <UploadIcon className="w-5 h-5 text-primary" />
+                                <div className="absolute inset-0 rounded-2xl border border-primary/20 opacity-0 group-hover:opacity-100 transition-all duration-500 scale-105" />
                             </div>
-                            <div className="text-center space-y-6">
+                            <div className="text-center space-y-8 z-10">
                                 <div className="space-y-2">
-                                    <p className="text-xl font-semibold text-foreground">Drag and drop video files to upload</p>
-                                    <p className="text-sm text-muted-foreground max-w-sm mx-auto">Upload content to detect brands, restricted objects, and offensive language.</p>
+                                    <p className="text-xl font-black text-foreground tracking-tight">Select Source</p>
+                                    <p className="text-muted-foreground max-w-[280px] mx-auto text-xs font-medium leading-relaxed opacity-40">Provide media for compliance analysis.</p>
                                 </div>
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="px-8 py-3 bg-accent text-white rounded-xl font-bold shadow-xl shadow-accent/25 hover:opacity-90 hover:translate-y-[-2px] transition-all active:scale-95"
-                                >
-                                    Select File
-                                </button>
-                                {onBrowseLibrary && (
+                                <div className="flex flex-col gap-4 items-center">
                                     <button
-                                        onClick={onBrowseLibrary}
-                                        className="px-8 py-3 bg-muted text-foreground rounded-xl font-bold hover:bg-muted/80 hover:translate-y-[-2px] transition-all active:scale-95"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="px-8 py-3 bg-primary text-primary-foreground rounded-lg font-black text-[10px] tracking-[0.3em] shadow-xl hover:brightness-105 transition-all active:scale-95 uppercase cursor-pointer"
                                     >
-                                        📚 Browse Library
+                                        BROWSE SOURCE
                                     </button>
-                                )}
-                                <div className="flex gap-4 justify-center items-center mt-12">
-                                    <span className="text-[10px] bg-muted/30 px-3 py-1 rounded-full font-bold text-muted-foreground tracking-widest uppercase">Max 120s</span>
-                                    <span className="text-[10px] bg-muted/30 px-3 py-1 rounded-full font-bold text-muted-foreground tracking-widest uppercase">MP4 / MOV</span>
+                                    {onBrowseLibrary && (
+                                        <button
+                                            onClick={onBrowseLibrary}
+                                            className="text-[10px] font-black text-muted-foreground hover:text-foreground transition-all tracking-[0.2em] uppercase opacity-30 hover:opacity-100 cursor-pointer"
+                                        >
+                                            Library Search
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="flex gap-8 justify-center items-center mt-12 opacity-20">
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em]">MAX 120S</span>
+                                    <div className="w-[1px] h-3 bg-border" />
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em]">MP4 / MOV</span>
                                 </div>
                             </div>
                             <input
@@ -191,89 +221,92 @@ const UploadZone: React.FC<UploadZoneProps> = ({ onUploadComplete, onFileSelecte
                     )}
 
                     {status !== 'idle' && (
-                        <div className="w-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                            <div className="flex items-center gap-6 p-6 rounded-2xl bg-background/40 border border-border/50 backdrop-blur-md shadow-2xl overflow-hidden">
-                                <div className="w-32 h-20 rounded-xl bg-black flex items-center justify-center flex-shrink-0 shadow-lg shadow-accent/20 overflow-hidden relative">
+                        <div className="w-full h-full flex flex-col z-10">
+                            {/* Compact Video Info */}
+                            <div className="flex items-center gap-6 p-6 rounded-2xl bg-white/[0.02] border border-white/5 backdrop-blur-3xl mb-8 transition-all">
+                                <div className="w-32 h-20 rounded-xl bg-black flex items-center justify-center flex-shrink-0 shadow-2xl overflow-hidden border border-white/5 group/preview relative cursor-pointer">
                                     {videoUrl && (
-                                        <video
-                                            src={videoUrl}
-                                            className="w-full h-full object-cover"
-                                            autoPlay
-                                            muted
-                                            loop
-                                            playsInline
-                                        />
+                                        <video src={videoUrl} className="w-full h-full object-cover opacity-60 group-hover/preview:opacity-100 transition-opacity" autoPlay muted loop playsInline />
                                     )}
-                                    <div className="absolute inset-0 bg-accent/10 pointer-events-none" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h3 className="font-bold truncate pr-4 text-xl tracking-tight">{metadata?.name}</h3>
-                                        <button onClick={reset} className="p-2 hover:bg-red-500/10 hover:text-red-500 rounded-full transition-all pointer-events-auto">
-                                            <X className="w-6 h-6" />
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h3 className="font-black truncate pr-4 text-lg tracking-tight text-foreground/80">{metadata?.name}</h3>
+                                        <button onClick={reset} className="p-2 hover:bg-white/10 text-muted-foreground hover:text-foreground rounded-lg transition-all cursor-pointer">
+                                            <X className="w-4 h-4" />
                                         </button>
                                     </div>
-                                    <div className="flex gap-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-80">
-                                        <span className="bg-muted/20 px-2 py-0.5 rounded">{metadata?.size}</span>
-                                        <span className="bg-muted/20 px-2 py-0.5 rounded">{metadata?.duration}</span>
-                                        <span className="bg-muted/20 px-2 py-0.5 rounded">{metadata?.resolution}</span>
+                                    <div className="flex gap-3 text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] opacity-40">
+                                        <span>{metadata?.size}</span>
+                                        <span>{metadata?.duration}</span>
+                                        <span>{metadata?.resolution}</span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-8 px-2">
-                                <div className="space-y-3">
-                                    <div className="flex justify-between items-end text-xs">
-                                        <span className="font-black uppercase tracking-widest flex items-center gap-3">
-                                            {status === 'uploading' ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                                                    <span className="animate-pulse">Uploading...</span>
-                                                </>
-                                            ) : status === 'processing' ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 animate-spin text-accent" />
-                                                    <span className="animate-pulse">Analyzing...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                                                    <span className="text-emerald-500">Video Verified</span>
-                                                </>
-                                            )}
-                                        </span>
-                                        <span className="text-accent font-black font-mono text-base">{Math.floor(progress)}%</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-muted/30 rounded-full overflow-hidden">
-                                        <div
-                                            className={cn(
-                                                "h-full transition-all duration-300 ease-out shadow-[0_0_15px_rgba(59,130,246,0.3)]",
-                                                status === 'ready' ? "bg-emerald-500" : "bg-accent"
-                                            )}
-                                            style={{ width: `${progress}%` }}
-                                        />
-                                    </div>
-                                </div>
-
-                                {status === 'ready' && (
-                                    <div className="flex flex-col gap-6 animate-in slide-in-from-bottom-8 duration-700">
-                                        <button
-                                            onClick={() => metadata && onUploadComplete(metadata)}
-                                            disabled={!metadata}
-                                            className={cn(
-                                                "w-full py-5 text-white rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-2xl transition-all",
-                                                metadata
-                                                    ? "bg-accent shadow-accent/40 hover:translate-y-[-2px] hover:shadow-accent/50 active:scale-[0.98]"
-                                                    : "bg-muted cursor-not-allowed opacity-50"
-                                            )}
-                                        >
-                                            <Play className="w-6 h-6 fill-current" />
-                                            {metadata ? "Run Compliance Analysis" : "Processing Video..."}
-                                        </button>
-                                        <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground font-black uppercase tracking-[0.3em]">
-                                            Local AI Engine Ready
+                            {/* Main Configuration Section */}
+                            <div className="flex-1 flex flex-col gap-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {status === 'uploading' || status === 'processing' ? (
+                                    <div className="flex-1 flex flex-col justify-center gap-6">
+                                        <div className="flex justify-between items-end mb-2">
+                                            <div className="flex items-center gap-3">
+                                                <Loader2 className="w-4 h-4 animate-spin text-foreground opacity-30" />
+                                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50">
+                                                    {status === 'uploading' ? 'Ingesting...' : 'Analyzing...'}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs font-black font-mono text-foreground opacity-50">{Math.floor(progress)}%</span>
+                                        </div>
+                                        <div className="h-0.5 w-full bg-secondary rounded-full overflow-hidden">
+                                            <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}% ` }} />
                                         </div>
                                     </div>
+                                ) : (
+                                    <>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                            {[
+                                                { label: 'Platform', value: platform, options: platforms, onChange: onPlatformChange },
+                                                { label: 'Rating', value: rating, options: ratings, onChange: onRatingChange },
+                                                { label: 'Region', value: region, options: regions, onChange: onRegionChange }
+                                            ].map((sel, idx) => (
+                                                <div key={idx} className="space-y-3">
+                                                    <label className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-30 ml-1">{sel.label}</label>
+                                                    <div className="relative group/sel">
+                                                        <div className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-white/[0.03] border border-white/5 hover:border-white/20 hover:bg-white/5 cursor-pointer transition-all">
+                                                            <span className="font-bold text-[10px] tracking-widest text-foreground/70 uppercase">{sel.value}</span>
+                                                            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground opacity-30" />
+                                                        </div>
+                                                        <div className="absolute bottom-full left-0 w-full mb-2 p-1.5 bg-[#0c0c0e] border border-white/10 rounded-xl shadow-2xl backdrop-blur-3xl opacity-0 scale-95 origin-bottom group-hover/sel:opacity-100 group-hover/sel:scale-100 pointer-events-none group-hover/sel:pointer-events-auto transition-all z-50">
+                                                            {sel.options.map(opt => (
+                                                                <button key={opt} onClick={() => sel.onChange(opt)} className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-[9px] font-black tracking-widest hover:bg-white/10 transition-all text-muted-foreground hover:text-foreground uppercase">
+                                                                    {opt}
+                                                                    {sel.value === opt && <Check className="w-3 h-3 text-white" />}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        <div className="mt-auto">
+                                            <button
+                                                onClick={() => metadata && onUploadComplete(metadata)}
+                                                disabled={!metadata}
+                                                className={cn(
+                                                    "w-full py-4 text-primary-foreground rounded-lg font-black text-[10px] tracking-[0.4em] transition-all relative overflow-hidden group/btn uppercase",
+                                                    metadata ? "bg-primary hover:brightness-105 active:scale-[0.99] shadow-lg shadow-white/5" : "bg-muted cursor-not-allowed opacity-20"
+                                                )}
+                                            >
+                                                EXECUTE COMPLIANCE SCAN
+                                            </button>
+                                            <div className="mt-6 flex items-center justify-center gap-4 opacity-5">
+                                                <div className="h-[1px] w-8 bg-white" />
+                                                <span className="text-[8px] font-black uppercase tracking-[0.4em]">Verified Unit</span>
+                                                <div className="h-[1px] w-8 bg-white" />
+                                            </div>
+                                        </div>
+                                    </>
                                 )}
                             </div>
                         </div>

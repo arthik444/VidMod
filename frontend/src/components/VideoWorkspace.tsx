@@ -339,7 +339,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                 {!isPlaying && videoUrl && !isEditMode && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] pointer-events-none">
                         <button
-                            className="w-20 h-20 flex items-center justify-center rounded-full bg-accent text-white shadow-2xl scale-100 hover:scale-110 transition-transform pointer-events-auto"
+                            className="w-20 h-20 flex items-center justify-center rounded-full bg-accent text-white shadow-2xl scale-100 hover:scale-110 transition-transform pointer-events-auto cursor-pointer"
                             onClick={togglePlay}
                         >
                             <Play className="fill-current w-8 h-8 ml-1" />
@@ -372,16 +372,16 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                             <div className="flex items-center gap-4">
                                 <button
                                     onClick={() => videoRef.current && (videoRef.current.currentTime -= 5)}
-                                    className="text-white/80 hover:text-white transition-colors"
+                                    className="text-white/80 hover:text-white transition-colors cursor-pointer"
                                 >
                                     <SkipBack className="w-5 h-5" />
                                 </button>
-                                <button onClick={togglePlay} className="text-white hover:text-white transition-colors">
+                                <button onClick={togglePlay} className="text-white hover:text-white transition-colors cursor-pointer">
                                     {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current" />}
                                 </button>
                                 <button
                                     onClick={() => videoRef.current && (videoRef.current.currentTime += 5)}
-                                    className="text-white/80 hover:text-white transition-colors"
+                                    className="text-white/80 hover:text-white transition-colors cursor-pointer"
                                 >
                                     <SkipForward className="w-5 h-5" />
                                 </button>
@@ -397,7 +397,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                                         if (isPlaying) videoRef.current?.pause();
                                     }}
                                     className={cn(
-                                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all",
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all cursor-pointer",
                                         isEditMode
                                             ? "bg-accent text-white shadow-[0_0_15px_rgba(59,130,246,0.5)]"
                                             : "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
@@ -411,7 +411,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                                 <button
                                     onClick={() => setShowOverlays(!showOverlays)}
                                     className={cn(
-                                        "p-2 rounded-lg transition-all",
+                                        "p-2 rounded-lg transition-all cursor-pointer",
                                         showOverlays
                                             ? "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
                                             : "bg-white/5 text-white/40 hover:bg-white/10"
@@ -424,7 +424,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
 
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2 group/vol">
-                                    <button onClick={toggleMute} className="text-white/80 hover:text-white transition-colors">
+                                    <button onClick={toggleMute} className="text-white/80 hover:text-white transition-colors cursor-pointer">
                                         {isMuted || volume === 0 ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
                                     </button>
                                     <div
@@ -438,7 +438,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                                         <div className="absolute top-0 left-0 h-full bg-white" style={{ width: `${isMuted ? 0 : volume * 100}%` }} />
                                     </div>
                                 </div>
-                                <button onClick={toggleFullscreen} className="text-white/80 hover:text-white transition-colors">
+                                <button onClick={toggleFullscreen} className="text-white/80 hover:text-white transition-colors cursor-pointer">
                                     <Maximize2 className="w-5 h-5" />
                                 </button>
                             </div>

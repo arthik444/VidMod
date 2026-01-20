@@ -42,8 +42,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
     if (isAnalyzing) {
         return (
             <aside className="w-full h-full flex flex-col glass-panel overflow-hidden">
-                <div className="p-6 border-b border-border bg-white/5">
-                    <h2 className="text-lg font-bold tracking-tight">Analysis Phase</h2>
+                <div className="p-6 border-b border-border bg-secondary/50">
+                    <h2 className="text-lg font-bold tracking-tight text-foreground">Analysis Phase</h2>
                 </div>
                 <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6 text-center">
                     <div className="relative">
@@ -99,7 +99,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     return (
         <div className="h-full flex flex-col glass-panel overflow-hidden shadow-2xl">
             {/* Tab Switcher */}
-            <div className="px-2 pt-2 border-b border-border bg-white/[0.02]">
+            <div className="px-2 pt-2 border-b border-border bg-secondary/20">
                 <div className="flex gap-1">
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
@@ -109,11 +109,11 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                 key={tab.id}
                                 onClick={() => setActivePanel(tab.id)}
                                 className={cn(
-                                    "flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-bold uppercase tracking-widest transition-all rounded-t-lg relative group",
-                                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                                    "flex-1 flex items-center justify-center gap-2 py-3 text-[10px] font-black uppercase tracking-[0.2em] transition-all rounded-t-lg relative group cursor-pointer",
+                                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                                 )}
                             >
-                                <Icon className={cn("w-3.5 h-3.5 transition-transform", isActive ? "scale-110" : "group-hover:scale-110")} />
+                                <Icon className={cn("w-3.5 h-3.5 transition-transform", isActive ? "scale-110 opacity-100" : "opacity-40 group-hover:opacity-100 group-hover:scale-110")} />
                                 <span>{tab.label}</span>
                                 {tab.count !== undefined && tab.count > 0 && (
                                     <span className="px-1.5 py-0.5 bg-primary/20 text-primary rounded-full text-[8px] tabular-nums font-black">
@@ -123,7 +123,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                 {isActive && (
                                     <motion.div
                                         layoutId="activeTab"
-                                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary shadow-[0_0_12px_rgba(59,130,246,0.8)]"
+                                        className="absolute bottom-0 left-0 right-0 h-px bg-primary shadow-[0_0_15px_rgba(255,255,255,0.1)]"
                                     />
                                 )}
                             </button>
@@ -145,9 +145,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         <div className="p-4 space-y-4">
                             <div className="flex items-center justify-between">
                                 <h3 className="font-bold text-xs uppercase tracking-[0.15em] text-muted-foreground">System Overview</h3>
-                                <div className="flex items-center gap-2 px-2 py-1 rounded-full bg-emerald-400/10 border border-emerald-400/20">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                    <span className="text-emerald-400 text-[9px] font-black uppercase tracking-widest leading-none">Compliant Output Ready</span>
+                                <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-secondary border border-border">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+                                    <span className="text-muted-foreground text-[9px] font-black uppercase tracking-[0.2em] leading-none">Ready for Output</span>
                                 </div>
                             </div>
 
@@ -157,10 +157,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                     { label: 'Rating', value: predictedAgeRating, sub: 'Predicted' },
                                     { label: 'Status', value: riskLevel, sub: 'Risk Level', color: riskColor },
                                 ].map((stat, i) => (
-                                    <div key={i} className="glass-card p-3 flex flex-col items-center justify-center text-center">
-                                        <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-widest mb-1">{stat.label}</span>
-                                        <span className={cn("text-lg font-black tracking-tight", stat.color)}>{stat.value}</span>
-                                        <span className="text-[8px] text-muted-foreground/60 font-medium uppercase mt-0.5">{stat.sub}</span>
+                                    <div key={i} className="glass-card p-3 flex flex-col items-center justify-center text-center bg-card/40 border-border">
+                                        <span className="text-[9px] text-muted-foreground font-bold uppercase tracking-[0.2em] mb-1">{stat.label}</span>
+                                        <span className={cn("text-lg font-black tracking-tight text-primary", stat.color)}>{stat.value}</span>
+                                        <span className="text-[8px] text-muted-foreground/60 font-medium uppercase mt-0.5 tracking-widest">{stat.sub}</span>
                                     </div>
                                 ))}
                             </div>
@@ -179,7 +179,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                         <CheckCircle2 className="w-6 h-6 text-emerald-400/40" />
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-xs font-bold uppercase tracking-widest">Safety Check Passed</p>
+                                        <p className="text-xs font-bold uppercase tracking-widest text-foreground">Safety Check Passed</p>
                                         <p className="text-[10px] text-muted-foreground">No content violations were identified.</p>
                                     </div>
                                 </div>
@@ -265,10 +265,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         </div>
 
                         {/* Footer Action */}
-                        <div className="p-4 border-t border-border bg-white/[0.02] mt-auto">
-                            <button className="w-full flex items-center justify-center gap-2 btn-primary group">
-                                <Download className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-                                <span className="text-xs font-bold uppercase tracking-widest">Download Analysis PDF</span>
+                        <div className="p-4 border-t border-border bg-secondary/20 mt-auto">
+                            <button className="w-full flex items-center justify-center gap-3 py-3 bg-secondary hover:brightness-110 border border-border rounded-lg transition-all group cursor-pointer">
+                                <Download className="w-4 h-4 text-muted-foreground group-hover:text-primary group-hover:-translate-y-0.5 transition-all" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground group-hover:text-primary">Export Analysis Data</span>
                             </button>
                         </div>
                     </motion.div>
@@ -293,8 +293,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         <div className="p-4 space-y-4">
                             <div className="flex items-center justify-between">
                                 <h3 className="font-bold text-xs uppercase tracking-[0.15em] text-muted-foreground">Version Management</h3>
-                                <div className="px-2 py-1 rounded-full bg-primary/10 border border-primary/20">
-                                    <span className="text-primary text-[9px] font-black uppercase tracking-widest">{editHistory.length} Snapshots</span>
+                                <div className="px-2 py-0.5 rounded-full bg-secondary border border-border shrink-0">
+                                    <span className="text-muted-foreground text-[9px] font-black uppercase tracking-[0.2em] whitespace-nowrap">{editHistory.length} SNAPSHOTS</span>
                                 </div>
                             </div>
 
@@ -321,7 +321,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                                 "glass-card p-4 transition-all duration-300 relative group",
                                                 selectedVersion === version.version
                                                     ? "border-primary/50 bg-primary/[0.03] ring-1 ring-primary/20 shadow-primary/10"
-                                                    : "bg-white/[0.02] border-border/50"
+                                                    : "bg-secondary/20 border-border"
                                             )}
                                         >
                                             <div className="flex items-center justify-between gap-4">
@@ -340,8 +340,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                                             <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{version.effectType}</span>
                                                         </div>
                                                         <p className="text-sm font-bold text-foreground/90 mt-0.5">"{version.objectName}"</p>
-                                                        <p className="text-[9px] font-medium text-muted-foreground mt-1 tabular-nums opacity-60">
-                                                            {new Date(version.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Secure Snapshot
+                                                        <p className="text-[9px] font-black text-muted-foreground/60 mt-1 uppercase tracking-[0.1em] tabular-nums whitespace-nowrap">
+                                                            {new Date(version.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • SYNC SNAPSHOT
                                                         </p>
                                                     </div>
                                                 </div>
@@ -349,7 +349,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={() => onPreviewVersion?.(version.version)}
-                                                        className="p-2.5 rounded-xl glass-panel hover:bg-white/10 text-primary transition-all active:scale-90"
+                                                        className="p-2.5 rounded-xl glass-panel hover:bg-white/10 text-primary transition-all active:scale-90 cursor-pointer"
                                                         title="Stream this version"
                                                     >
                                                         <Eye className="w-4 h-4" />
@@ -357,7 +357,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                                     <a
                                                         href={version.downloadUrl.split('?')[0]}
                                                         download={`vidmod_v${version.version}.mp4`}
-                                                        className="p-2.5 rounded-xl glass-panel hover:bg-emerald-400/10 text-emerald-400 transition-all active:scale-90"
+                                                        className="p-2.5 rounded-xl glass-panel hover:bg-emerald-400/10 text-emerald-400 transition-all active:scale-90 cursor-pointer"
                                                         title="Export Secure Media"
                                                     >
                                                         <Download className="w-4 h-4" />

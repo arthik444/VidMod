@@ -1,16 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     BarChart3,
     Clock,
     FileText,
     Upload,
-    LayoutDashboard,
-    Settings,
-    FileVideo
+    FileVideo,
+    ShieldCheck,
+    ChevronDown,
+    ChevronUp,
+    Video,
+    Settings
 } from 'lucide-react';
 import { type VideoMetadata } from './UploadZone';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { type EnforcementObject, RemediationAction } from '../services/policyEngine';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -20,9 +24,12 @@ interface SidebarProps {
     activeTab: string;
     setActiveTab: (tab: string) => void;
     metadata?: VideoMetadata | null;
+    policy?: EnforcementObject;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata, policy }) => {
+    const [showPolicies, setShowPolicies] = useState(true);
+
     const menuItems = [
         { id: 'Upload', icon: Upload, label: 'Upload' },
         { id: 'Analysis', icon: BarChart3, label: 'Analysis' },
@@ -30,41 +37,93 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata }) 
         { id: 'Compliance', icon: FileText, label: 'Compliance Report' },
     ];
 
+    const getActionColor = (action: string) => {
+        switch (action) {
+            case RemediationAction.ALLOWED: return 'text-emerald-400';
+            case RemediationAction.BLOCK_SEGMENT: return 'text-red-400';
+            case RemediationAction.PIXELATE:
+            case RemediationAction.BLUR: return 'text-amber-400';
+            case RemediationAction.OBJECT_REPLACE: return 'text-blue-400';
+            default: return 'text-accent';
+        }
+    };
+
     return (
         <aside className="w-64 border-r border-border flex flex-col bg-card/50 backdrop-blur-sm">
-            <div className="p-6">
-                <div className="flex items-center gap-2 mb-8">
-                    <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center">
-                        <LayoutDashboard className="w-5 h-5 text-white" />
+            <div className="p-6 overflow-y-auto no-scrollbar flex-1">
+                <div className="flex items-center gap-2 mb-8 px-2">
+                    <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center shadow-sm">
+                        <Video className="w-4 h-4 text-zinc-950" />
                     </div>
-                    <span className="font-bold text-lg tracking-tight">Zenith Sensor</span>
+                    <span className="font-black text-xs uppercase tracking-[0.2em] text-zinc-100">Compliance AI</span>
                 </div>
 
-                <nav className="space-y-1">
+                <nav className="space-y-1 mb-8">
                     {menuItems.map((item) => (
                         <button
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-all group",
+                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[10px] font-black uppercase tracking-[0.15em] transition-all group cursor-pointer",
                                 activeTab === item.id
-                                    ? "bg-accent/10 text-accent shadow-[0_0_15px_rgba(59,130,246,0.1)]"
-                                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                                    ? "bg-zinc-100 text-zinc-950 shadow-lg"
+                                    : "text-zinc-500 hover:bg-white/5 hover:text-zinc-100"
                             )}
                         >
                             <item.icon className={cn(
-                                "w-4 h-4",
-                                activeTab === item.id ? "text-accent" : "text-muted-foreground group-hover:text-foreground"
+                                "w-3.5 h-3.5",
+                                activeTab === item.id ? "text-zinc-950" : "text-zinc-500 group-hover:text-zinc-300"
                             )} />
                             {item.label}
                         </button>
                     ))}
                 </nav>
+
+                {/* Policy Section */}
+                {policy && (
+                    <div className="space-y-3">
+                        <button
+                            onClick={() => setShowPolicies(!showPolicies)}
+                            className="w-full flex items-center justify-between text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-widest">Locked Policies</span>
+                            </div>
+                            {showPolicies ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                        </button>
+
+                        {showPolicies && (
+                            <div className="bg-background/40 rounded-xl p-3 border border-border/50 space-y-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                                {Object.entries(policy.rules).map(([category, action]) => {
+                                    if (action === RemediationAction.ALLOWED) return null;
+                                    return (
+                                        <div key={category} className="flex flex-col gap-1">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] font-medium text-muted-foreground capitalize">
+                                                    {category.replace('_', ' ')}
+                                                </span>
+                                                <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-white/5 border border-white/5", getActionColor(action))}>
+                                                    {action}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {Object.values(policy.rules).every(a => a === RemediationAction.ALLOWED) && (
+                                    <div className="text-[10px] text-emerald-400 font-medium text-center py-2">
+                                        All Content Allowed
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
 
-            <div className="mt-auto p-6 border-t border-border space-y-4">
+            <div className="p-6 border-t border-border space-y-4">
                 {metadata && (
-                    <div className="space-y-3 pb-4">
+                    <div className="space-y-3 pb-2">
                         <div className="flex items-center gap-2 text-muted-foreground">
                             <FileVideo className="w-3.5 h-3.5" />
                             <span className="text-[10px] font-bold uppercase tracking-widest">Active File</span>
@@ -81,7 +140,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata }) 
                         </div>
                     </div>
                 )}
-                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors">
+                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground transition-colors cursor-pointer">
                     <Settings className="w-4 h-4" />
                     Settings
                 </button>

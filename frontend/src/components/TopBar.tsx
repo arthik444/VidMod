@@ -1,87 +1,70 @@
 import React from 'react';
-import { Upload, Download, ChevronDown, Bell, Globe, Layout, Check } from 'lucide-react';
+import { Download, Bell, ShieldCheck, Video, Layout } from 'lucide-react';
 
 interface TopBarProps {
     platform: string;
     region: string;
-    onPlatformChange: (platform: string) => void;
-    onRegionChange: (region: string) => void;
+    rating: string;
+    isAnalyzing: boolean;
+    hasVideo: boolean;
 }
 
-const platforms = ['YouTube', 'OTT Streaming', 'Kids Content', 'Airline Entertainment'];
-const regions = ['US', 'EU', 'Middle East', 'Asia'];
-
-const TopBar: React.FC<TopBarProps> = ({ platform, region, onPlatformChange, onRegionChange }) => {
+const TopBar: React.FC<TopBarProps> = ({
+    platform,
+    region,
+    rating,
+    isAnalyzing,
+    hasVideo
+}) => {
     return (
         <header className="h-16 border-b border-border flex items-center justify-between px-6 bg-card/30 backdrop-blur-md sticky top-0 z-10">
             <div className="flex items-center gap-4">
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">Workspace</h2>
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-white/5 text-zinc-100">
+                    <Video className="w-3.5 h-3.5 text-zinc-400" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Compliance AI</span>
+                </div>
+
                 <div className="h-4 w-[1px] bg-border mx-2" />
 
-                {/* Platform Selector */}
-                <div className="relative group/dropdown">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-background/50 hover:bg-muted/20 cursor-pointer transition-all group">
-                        <Layout className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium">{platform}</span>
-                        <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                {hasVideo ? (
+                    <div className="flex items-center gap-3 animate-in fade-in slide-in-from-left-4 duration-500">
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/5 bg-zinc-900 shadow-sm">
+                            <Layout className="w-3 h-3 text-zinc-500" />
+                            <span className="text-[10px] font-black uppercase tracking-tight text-zinc-300">{platform}</span>
+                        </div>
+                        <div className="text-zinc-700 font-light">/</div>
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/5 bg-zinc-900 shadow-sm">
+                            <ShieldCheck className="w-3 h-3 text-zinc-500" />
+                            <span className="text-[10px] font-black uppercase tracking-tight text-zinc-300">{rating}</span>
+                        </div>
+                        <div className="text-zinc-700 font-light">/</div>
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/5 bg-zinc-900 shadow-sm">
+                            <span className="text-[10px] font-black uppercase tracking-tight text-zinc-300">{region}</span>
+                        </div>
                     </div>
-                    <div className="absolute top-[calc(100%+4px)] left-0 w-56 p-1 bg-background border border-border rounded-xl shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover/dropdown:opacity-100 group-hover/dropdown:translate-y-0 group-hover/dropdown:pointer-events-auto transition-all z-50 backdrop-blur-xl">
-                        {platforms.map((p) => (
-                            <button
-                                key={p}
-                                onClick={() => onPlatformChange(p)}
-                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted/50 transition-colors"
-                            >
-                                {p}
-                                {platform === p && <Check className="w-4 h-4 text-accent" />}
-                            </button>
-                        ))}
+                ) : (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground">
+                        <span className="text-xs font-bold uppercase tracking-widest">Waiting for configuration...</span>
                     </div>
-                </div>
-
-                <div className="text-muted-foreground font-light px-1">/</div>
-
-                {/* Region Selector */}
-                <div className="relative group/dropdown">
-                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md border border-border bg-background/50 hover:bg-muted/20 cursor-pointer transition-all group">
-                        <Globe className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-sm font-medium">{region}</span>
-                        <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                    </div>
-                    <div className="absolute top-[calc(100%+4px)] left-0 w-48 p-1 bg-background border border-border rounded-xl shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover/dropdown:opacity-100 group-hover/dropdown:translate-y-0 group-hover/dropdown:pointer-events-auto transition-all z-50 backdrop-blur-xl">
-                        {regions.map((r) => (
-                            <button
-                                key={r}
-                                onClick={() => onRegionChange(r)}
-                                className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm font-medium hover:bg-muted/50 transition-colors"
-                            >
-                                {r}
-                                {region === r && <Check className="w-4 h-4 text-accent" />}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                )}
             </div>
 
             <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/5 border border-accent/20 text-accent mr-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">{platform} · {region}</span>
-                </div>
+                {isAnalyzing && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100/5 border border-white/5 text-zinc-500 mr-2">
+                        <div className="w-1 h-1 rounded-full bg-zinc-500 animate-pulse" />
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em]">Live Analysis</span>
+                    </div>
+                )}
 
-                <button className="p-2 mr-1 rounded-full hover:bg-muted/30 text-muted-foreground hover:text-foreground relative">
+                <button className="p-2 mr-1 rounded-full hover:bg-muted/30 text-muted-foreground hover:text-foreground relative cursor-pointer">
                     <Bell className="w-5 h-5" />
                     <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-card" />
                 </button>
 
-                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-background border border-border text-sm font-medium hover:bg-muted/30 transition-all">
-                    <Upload className="w-4 h-4" />
-                    Upload Video
-                </button>
-
-                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent text-white text-sm font-medium hover:bg-accent/90 shadow-lg shadow-accent/20 transition-all">
-                    <Download className="w-4 h-4" />
-                    Export Result
+                <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-100 text-zinc-950 text-[10px] font-black hover:bg-white transition-all uppercase tracking-[0.2em] cursor-pointer">
+                    <Download className="w-3.5 h-3.5" />
+                    Export
                 </button>
             </div>
         </header>
