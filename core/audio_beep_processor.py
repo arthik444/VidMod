@@ -89,6 +89,10 @@ class AudioBeepProcessor:
         """
         Apply beep sounds over profanity in video.
         
+        This REPLACES the audio during profanity with beep sounds by:
+        1. Muting the original audio during profanity timestamps
+        2. Overlaying beep sounds at those same timestamps
+        
         Args:
             video_path: Input video file
             profanity_matches: List of ProfanityMatch objects
@@ -112,14 +116,25 @@ class AudioBeepProcessor:
             shutil.copy(video_path, output_path)
             return output_path
         
-        logger.info(f"Applying {len(profanity_matches)} beeps to video")
+        logger.info(f"Applying {len(profanity_matches)} beeps to video (replacing audio)")
         
         try:
             # Create temporary directory for beep files
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_path = Path(temp_dir)
                 
-                # Generate individual beeps for each profanity
+                # Step 1: Build volume filter to MUTE original audio during profanity
+                # Use volume filter with enable expression to mute during profanity times
+                volume_conditions = []
+                for match in profanity_matches:
+                    # between(t, start, end) returns 1 if current time is in range
+                    volume_conditions.append(f"between(t,{match.start_time},{match.end_time})")
+                
+                # If any condition is true, volume=0 (mute), else volume=1 (normal)
+                # The enable expression: if (condition1 OR condition2 OR ...) then apply volume=0
+                volume_filter = f"volume=enable='{'|'.join(volume_conditions)}':volume=0"
+                
+                # Step 2: Generate beep file for EACH profanity instance
                 beep_files = []
                 for i, match in enumerate(profanity_matches):
                     duration = match.end_time - match.start_time
@@ -127,22 +142,27 @@ class AudioBeepProcessor:
                     self.generate_beep(duration, beep_path, beep_frequency, beep_volume)
                     beep_files.append((beep_path, match.start_time))
                 
-                # Build FFmpeg filter complex for overlaying beeps
-                # Strategy: Use amix to overlay each beep at its timestamp
+                # Step 3: Build FFmpeg command to:
+                # a) Apply volume filter to mute profanity in original audio
+                # b) Overlay beeps at profanity timestamps
+                # c) Mix the muted audio with the beeps
+                
                 filter_parts = []
                 
-                # Label the original audio
-                filter_parts.append("[0:a]asplit=1[original]")
+                # Apply volume filter to original audio (mutes profanity)
+                filter_parts.append(f"[0:a]{volume_filter}[muted]")
                 
-                # For each beep, add delay and label it
+                # For each beep, add delay to align with timestamp
                 for i, (beep_path, start_time) in enumerate(beep_files):
                     delay_ms = int(start_time * 1000)
                     filter_parts.append(f"[{i+1}:a]adelay={delay_ms}|{delay_ms}[beep{i}]")
                 
-                # Mix all beeps with original audio
-                inputs_to_mix = ["original"] + [f"beep{i}" for i in range(len(beep_files))]
+                # Mix muted audio with all beeps
+                inputs_to_mix = ["muted"] + [f"beep{i}" for i in range(len(beep_files))]
                 mix_inputs = "".join(f"[{inp}]" for inp in inputs_to_mix)
-                filter_parts.append(f"{mix_inputs}amix=inputs={len(inputs_to_mix)}:duration=first:dropout_transition=0[out]")
+                filter_parts.append(
+                    f"{mix_inputs}amix=inputs={len(inputs_to_mix)}:duration=first:dropout_transition=0[out]"
+                )
                 
                 filter_complex = ";".join(filter_parts)
                 
@@ -161,14 +181,15 @@ class AudioBeepProcessor:
                 cmd.extend([
                     "-filter_complex", filter_complex,
                     "-map", "0:v",  # Copy video stream
-                    "-map", "[out]",  # Use mixed audio
+                    "-map", "[out]",  # Use processed audio
                     "-c:v", "copy",  # Don't re-encode video
                     "-c:a", "aac",  # Encode audio as AAC
                     "-b:a", "192k",  # Audio bitrate
                     str(output_path)
                 ])
                 
-                logger.info(f"Running FFmpeg with {len(beep_files)} beep overlays")
+                logger.info(f"Running FFmpeg to mute profanity and overlay {len(beep_files)} beeps")
+                logger.debug(f"Volume filter: {volume_filter}")
                 logger.debug(f"FFmpeg command: {' '.join(cmd)}")
                 
                 result = subprocess.run(
@@ -178,7 +199,7 @@ class AudioBeepProcessor:
                     text=True
                 )
                 
-                logger.info(f"✅ Beeps applied successfully: {output_path}")
+                logger.info(f"✅ Profanity replaced with beeps successfully: {output_path}")
                 return output_path
                 
         except subprocess.CalledProcessError as e:
@@ -187,6 +208,7 @@ class AudioBeepProcessor:
         except Exception as e:
             logger.error(f"Beep processing error: {e}")
             raise
+
     
     def apply_simple_mute(
         self,

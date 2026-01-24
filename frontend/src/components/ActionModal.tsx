@@ -10,14 +10,15 @@ import {
     blurObject,
     getDownloadUrl,
     getSegmentedDownloadUrl,
-    detectObjects
+    detectObjects,
+    censorAudio
 } from '../services/api';
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-export type ActionType = 'blur' | 'pixelate' | 'mask' | 'replace-pika' | 'replace-vace' | 'replace-runway';
+export type ActionType = 'blur' | 'pixelate' | 'mask' | 'replace-pika' | 'replace-vace' | 'replace-runway' | 'censor-beep' | 'censor-dub';
 
 interface ActionModalProps {
     isOpen: boolean;
@@ -58,6 +59,8 @@ const ActionModal: React.FC<ActionModalProps> = ({
     const [referenceImage, setReferenceImage] = useState<File | null>(null);
     const [maskOnly, setMaskOnly] = useState(true);
     const [suggestions, setSuggestions] = useState<string[]>([]);
+    const [voiceSampleStart, setVoiceSampleStart] = useState<number>(0);
+    const [voiceSampleEnd, setVoiceSampleEnd] = useState<number>(10);
 
     // Reset state when modal opens
     useEffect(() => {
@@ -142,6 +145,18 @@ const ActionModal: React.FC<ActionModalProps> = ({
                     finalDownloadUrl = getDownloadUrl(jobId);
                     break;
 
+                case 'censor-beep':
+                    // Censor audio with beep sounds
+                    await censorAudio(jobId, 'beep');
+                    finalDownloadUrl = getDownloadUrl(jobId);
+                    break;
+
+                case 'censor-dub':
+                    // Censor audio with voice dubbing
+                    await censorAudio(jobId, 'dub', voiceSampleStart, voiceSampleEnd);
+                    finalDownloadUrl = getDownloadUrl(jobId);
+                    break;
+
                 default:
                     throw new Error(`Unknown action type: ${actionType}`);
             }
@@ -164,6 +179,8 @@ const ActionModal: React.FC<ActionModalProps> = ({
             case 'replace-pika': return 'Replace with Pika Labs';
             case 'replace-vace': return 'Replace with VACE';
             case 'replace-runway': return 'Replace with Runway Gen-4';
+            case 'censor-beep': return 'Censor Audio (Beep)';
+            case 'censor-dub': return 'Censor Audio (Voice Dub)';
             default: return 'Execute Action';
         }
     };
@@ -176,6 +193,8 @@ const ActionModal: React.FC<ActionModalProps> = ({
             case 'replace-pika': return `Replace "${objectPrompt}" using Pika Labs.`;
             case 'replace-vace': return `Replace "${objectPrompt}" using VACE inpainting.`;
             case 'replace-runway': return `Replace "${objectPrompt}" using Runway Gen-4.`;
+            case 'censor-beep': return `Detect profanity and overlay beep sounds (fast & free).`;
+            case 'censor-dub': return `Detect profanity and replace with clean voice dubs (premium).`;
             default: return '';
         }
     };
@@ -308,6 +327,45 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                 </div>
                             )}
                         </>
+                    )}
+
+                    {/* Audio Censoring Voice Sample (for dub mode only) */}
+                    {actionType === 'censor-dub' && (
+                        <div className="space-y-3 p-3 bg-violet-500/10 border border-violet-500/30 rounded-lg">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-violet-400">🎙️ Voice Sample for Cloning</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Select a 10-15 second segment of clean speech (NO profanity) from the video for voice cloning.
+                            </p>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-muted-foreground">Start Time (sec)</label>
+                                    <input
+                                        type="number"
+                                        value={voiceSampleStart}
+                                        onChange={(e) => setVoiceSampleStart(parseFloat(e.target.value))}
+                                        step="0.1"
+                                        min="0"
+                                        className="w-full px-3 py-2 bg-muted/30 rounded-lg border border-border text-sm focus:border-violet-500 focus:outline-none"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-muted-foreground">End Time (sec)</label>
+                                    <input
+                                        type="number"
+                                        value={voiceSampleEnd}
+                                        onChange={(e) => setVoiceSampleEnd(parseFloat(e.target.value))}
+                                        step="0.1"
+                                        min="0"
+                                        className="w-full px-3 py-2 bg-muted/30 rounded-lg border border-border text-sm focus:border-violet-500 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-xs text-violet-300">
+                                ⏱️ Duration: {(voiceSampleEnd - voiceSampleStart).toFixed(1)}s
+                            </p>
+                        </div>
                     )}
 
                     {/* Status Messages */}

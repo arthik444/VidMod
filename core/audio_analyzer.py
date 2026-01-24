@@ -96,21 +96,31 @@ Analyze this video's audio track and detect ALL instances of profanity, cuss wor
 
 {custom_instruction}
 
-For EACH profane word or phrase detected, provide:
-1. The exact word/phrase spoken
-2. Start timestamp in seconds (precise to 0.1s)
-3. End timestamp in seconds (precise to 0.1s)
-4. A clean, contextually appropriate replacement word/phrase
-5. Your confidence level (high/medium/low)
-6. Brief context (what was being said)
+CRITICAL INSTRUCTIONS:
+1. Detect COMPLETE profane phrases, not individual words
+   - Example: "piece of shit" should be ONE detection with timestamps covering the ENTIRE phrase
+   - Example: "what the fuck" should be ONE detection, not three separate words
+   - Example: "holy shit" should be ONE detection covering both words
+
+2. For EACH profane phrase detected, provide:
+   - The exact COMPLETE phrase spoken (all words together)
+   - Start timestamp: When the FIRST word of the phrase begins (precise to 0.1s)
+   - End timestamp: When the LAST word of the phrase ends (precise to 0.1s)
+   - A clean, contextually appropriate replacement for the ENTIRE phrase
+   - Your confidence level (high/medium/low)
+   - Brief context (what was being said)
+
+3. Ensure timestamps cover the ENTIRE duration of the profane phrase
+   - Include any connecting words like "of", "the", "a" that are part of the phrase
+   - Make sure end_time is AFTER all words in the phrase have been spoken
 
 Return ONLY a valid JSON array with this structure:
 [
   {{
-    "word": "profane word spoken",
+    "word": "complete profane phrase spoken",
     "start_time": 12.5,
-    "end_time": 13.2,
-    "replacement": "clean alternative",
+    "end_time": 13.8,
+    "replacement": "clean alternative for entire phrase",
     "confidence": "high",
     "context": "Speaker was expressing frustration"
   }}
@@ -118,7 +128,12 @@ Return ONLY a valid JSON array with this structure:
 
 If NO profanity is detected, return an empty array: []
 
-Be thorough - check the entire audio track. Include mild profanity, cuss words, and slurs.
+EXAMPLES:
+- If speaker says "piece of shit" at 5.2s-6.1s, return ONE entry with word="piece of shit", start_time=5.2, end_time=6.1
+- If speaker says "damn" at 10.5s-10.9s, return ONE entry with word="damn", start_time=10.5, end_time=10.9
+- If speaker says "what the hell" at 15.0s-15.8s, return ONE entry with word="what the hell", start_time=15.0, end_time=15.8
+
+Be thorough - check the entire audio track. Detect complete phrases, not fragmented words.
 """
             
             # Generate analysis
@@ -161,6 +176,10 @@ Be thorough - check the entire audio track. Include mild profanity, cuss words, 
                     logger.warning(f"Skipping invalid profanity match: {item} - {e}")
                     continue
             
+            # Post-processing: Merge adjacent/overlapping detections
+            # This catches cases where Gemini still splits phrases
+            matches = self._merge_adjacent_matches(matches)
+            
             logger.info(f"✅ Detected {len(matches)} instances of profanity")
             
             # Clean up uploaded file
@@ -174,6 +193,59 @@ Be thorough - check the entire audio track. Include mild profanity, cuss words, 
         except Exception as e:
             logger.error(f"Audio analysis failed: {e}")
             raise
+    
+    def _merge_adjacent_matches(
+        self,
+        matches: List[ProfanityMatch],
+        merge_threshold: float = 0.5
+    ) -> List[ProfanityMatch]:
+        """
+        Merge profanity matches that are close together (likely parts of same phrase).
+        
+        Args:
+            matches: List of profanity matches
+            merge_threshold: Maximum gap in seconds to merge (default: 0.5s)
+            
+        Returns:
+            List of merged matches
+        """
+        if len(matches) <= 1:
+            return matches
+        
+        # Sort by start time
+        sorted_matches = sorted(matches, key=lambda m: m.start_time)
+        
+        merged = []
+        current = sorted_matches[0]
+        
+        for next_match in sorted_matches[1:]:
+            # Check if next match is within threshold of current match end
+            gap = next_match.start_time - current.end_time
+            
+            if gap <= merge_threshold:
+                # Merge: extend current match to include next match
+                logger.info(f"Merging adjacent profanity: '{current.word}' + '{next_match.word}' (gap: {gap:.2f}s)")
+                current = ProfanityMatch(
+                    word=f"{current.word} {next_match.word}",
+                    start_time=current.start_time,
+                    end_time=next_match.end_time,
+                    replacement=f"{current.replacement} {next_match.replacement}",
+                    confidence=current.confidence,
+                    context=current.context
+                )
+            else:
+                # No merge needed, save current and move to next
+                merged.append(current)
+                current = next_match
+        
+        # Don't forget the last match
+        merged.append(current)
+        
+        if len(merged) < len(sorted_matches):
+            logger.info(f"Merged {len(sorted_matches)} detections into {len(merged)} continuous phrases")
+        
+        return merged
+            
     
     def get_profanity_summary(self, matches: List[ProfanityMatch]) -> Dict[str, Any]:
         """
