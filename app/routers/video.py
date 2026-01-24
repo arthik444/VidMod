@@ -71,7 +71,9 @@ def get_pipeline(settings: Settings = Depends(get_settings)) -> VideoPipeline:
             ffmpeg_path=settings.get_ffmpeg_path(),
             ffprobe_path=settings.get_ffprobe_path(),
             aws_bucket_name=settings.aws_s3_bucket_name if settings.aws_s3_bucket_name else None,
-            aws_region=settings.aws_region
+            aws_region=settings.aws_region,
+            aws_access_key_id=settings.aws_access_key_id if settings.aws_access_key_id else None,
+            aws_secret_access_key=settings.aws_secret_access_key if settings.aws_secret_access_key else None
         )
     return _pipeline
 
