@@ -299,27 +299,26 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         exit={{ opacity: 0, scale: 0.98 }}
                         className="flex-1 flex flex-col overflow-hidden"
                     >
-                        <div className="p-4 space-y-4">
+                        <div className="p-4 space-y-3">
                             <div className="flex items-center justify-between">
-                                <h3 className="font-bold text-xs uppercase tracking-[0.15em] text-muted-foreground">Version Management</h3>
-                                <div className="px-2 py-0.5 rounded-full bg-secondary border border-border shrink-0">
-                                    <span className="text-muted-foreground text-[9px] font-black uppercase tracking-[0.2em] whitespace-nowrap">{editHistory.length} SNAPSHOTS</span>
+                                <h3 className="font-semibold text-[10px] uppercase tracking-wider text-muted-foreground/80 font-mono">Archive / History</h3>
+                                <div className="px-2 py-0.5 rounded border border-border bg-secondary/30">
+                                    <span className="text-muted-foreground/80 text-[8px] font-semibold uppercase tracking-wider">{editHistory.length} Snapshots</span>
                                 </div>
                             </div>
 
-                            <p className="text-[10px] text-muted-foreground leading-relaxed">
-                                Review and export previous iterations of your compliance workflow. Toggle versions to include in the final render.
+                            <p className="text-[10px] text-muted-foreground/60 leading-relaxed font-mono">
+                                Versioned iterations of the current remediation workflow. Enabled versions will be consolidated in the final render.
                             </p>
                         </div>
 
                         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3 custom-scrollbar">
                             {editHistory.length === 0 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 rounded-2xl bg-white/[0.02] border border-dashed border-border/50 opacity-40">
-                                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                                        <History className="w-6 h-6" />
+                                <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4 opacity-40">
+                                    <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                                        <History className="w-8 h-8" />
                                     </div>
-                                    <p className="text-xs font-bold uppercase tracking-widest leading-none">No Iterations Found</p>
-                                    <p className="text-[10px] max-w-[160px]">Apply remediation actions to generate version snapshots.</p>
+                                    <p className="text-xs font-bold uppercase tracking-[0.2em]">No Iterations Found</p>
                                 </div>
                             ) : (
                                 <div className="space-y-3">
@@ -327,56 +326,57 @@ const RightPanel: React.FC<RightPanelProps> = ({
                                         <div
                                             key={version.id}
                                             className={cn(
-                                                "glass-card p-4 transition-all duration-300 relative group",
+                                                "p-3 border transition-all duration-200 relative group rounded",
                                                 selectedVersion === version.version
-                                                    ? "border-primary/50 bg-primary/[0.03] ring-1 ring-primary/20 shadow-primary/10"
-                                                    : "bg-secondary/20 border-border"
+                                                    ? "border-primary/50 bg-primary/[0.02]"
+                                                    : "bg-transparent border-border/80"
                                             )}
                                         >
                                             <div className="flex items-center justify-between gap-4">
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex items-center gap-3">
                                                     <div className="relative">
                                                         <input
                                                             type="checkbox"
                                                             checked={version.enabled}
                                                             onChange={() => onToggleVersion?.(version.id)}
-                                                            className="w-4 h-4 rounded border-border bg-transparent text-primary focus:ring-primary/50 cursor-pointer"
+                                                            className="w-4 h-4 rounded border-border text-primary focus:ring-primary/50 cursor-pointer"
                                                         />
                                                     </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[11px] font-black text-primary uppercase">v{version.version}</span>
-                                                            <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">{version.effectType}</span>
+                                                    <div className="font-mono">
+                                                        <div className="flex items-center gap-2 leading-none">
+                                                            <span className="text-[10px] font-semibold text-primary/80 uppercase tracking-widest leading-none">v{version.version}</span>
+                                                            <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                                                            <span className="text-[9px] font-semibold text-muted-foreground/40 uppercase tracking-wider leading-none">{version.effectType}</span>
                                                         </div>
-                                                        <p className="text-sm font-bold text-foreground/90 mt-0.5">"{version.objectName}"</p>
-                                                        <p className="text-[9px] font-black text-muted-foreground/60 mt-1 uppercase tracking-[0.1em] tabular-nums whitespace-nowrap">
-                                                            {new Date(version.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • SYNC SNAPSHOT
+                                                        <p className="text-xs font-semibold text-foreground/90 mt-1 truncate">"{version.objectName}"</p>
+                                                        <p className="text-[9px] font-semibold text-muted-foreground/40 mt-1 uppercase tracking-widest whitespace-nowrap">
+                                                            {new Date(version.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </p>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-1.5 font-mono">
                                                     <button
                                                         onClick={() => onPreviewVersion?.(version.version)}
-                                                        className="p-2.5 rounded-xl glass-panel hover:bg-white/10 text-primary transition-all active:scale-90 cursor-pointer"
-                                                        title="Stream this version"
+                                                        className="p-1.5 rounded border border-border bg-secondary/10 hover:bg-secondary/20 text-muted-foreground/60 transition-all hover:text-primary"
+                                                        title="Preview Snapshot"
                                                     >
-                                                        <Eye className="w-4 h-4" />
+                                                        <Eye className="w-3.5 h-3.5" />
                                                     </button>
                                                     <a
                                                         href={version.downloadUrl.split('?')[0]}
                                                         download={`vidmod_v${version.version}.mp4`}
-                                                        className="p-2.5 rounded-xl glass-panel hover:bg-emerald-400/10 text-emerald-400 transition-all active:scale-90 cursor-pointer"
-                                                        title="Export Secure Media"
+                                                        className="p-1.5 rounded border border-border bg-secondary/10 hover:bg-secondary/20 text-muted-foreground/60 transition-all hover:text-emerald-500"
+                                                        title="Export Component"
                                                     >
-                                                        <Download className="w-4 h-4" />
+                                                        <Download className="w-3.5 h-3.5" />
                                                     </a>
                                                 </div>
                                             </div>
 
                                             {version.enabled && (
-                                                <div className="absolute top-0 right-0 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    <div className="w-1 h-1 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                                                <div className="absolute top-1 right-1 opacity-40 transition-opacity">
+                                                    <div className="w-1 h-1 rounded-full bg-emerald-500" />
                                                 </div>
                                             )}
                                         </div>

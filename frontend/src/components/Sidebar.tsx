@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
     BarChart3,
-    Clock,
     FileText,
     Upload,
     FileVideo,
@@ -33,7 +32,6 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata, po
     const menuItems = [
         { id: 'Upload', icon: Upload, label: 'Upload' },
         { id: 'Analysis', icon: BarChart3, label: 'Analysis' },
-        { id: 'Timeline', icon: Clock, label: 'Timeline' },
         { id: 'Compliance', icon: FileText, label: 'Compliance Report' },
     ];
 
