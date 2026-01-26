@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Loader2, Download, EyeOff, RefreshCw, CheckCircle2, AlertTriangle, Sparkles, Plus, Zap } from 'lucide-react';
+import { X, Loader2, Download, EyeOff, RefreshCw, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -63,7 +63,6 @@ const ActionModal: React.FC<ActionModalProps> = ({
     const [suggestions, setSuggestions] = useState<string[]>([]);
     const [profanityMatches, setProfanityMatches] = useState<Array<{ word: string, replacement: string, suggestions?: string[] }>>([]);
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
-    const [manualMode, setManualMode] = useState(false); // Toggle between auto and manual word entry
 
     // Reset state when modal opens
     useEffect(() => {
@@ -110,31 +109,6 @@ const ActionModal: React.FC<ActionModalProps> = ({
         }
     };
 
-    // Regenerate suggestions for all words
-    const handleRegenerateSuggestions = async () => {
-        if (profanityMatches.length === 0) return;
-
-        setLoadingSuggestions(true);
-        try {
-            const words = profanityMatches.map(m => m.word);
-            const suggestionsResult = await suggestReplacements(jobId, words);
-
-            const updatedMatches = profanityMatches.map((match) => {
-                const wordSuggestion = suggestionsResult.suggestions.find(s => s.original_word === match.word);
-                return {
-                    ...match,
-                    replacement: wordSuggestion?.suggestions[0] || match.replacement,
-                    suggestions: wordSuggestion?.suggestions || match.suggestions || []
-                };
-            });
-
-            setProfanityMatches(updatedMatches);
-            setLoadingSuggestions(false);
-        } catch (err) {
-            console.error('Failed to regenerate suggestions:', err);
-            setLoadingSuggestions(false);
-        }
-    };
 
     // Manually generate suggestions for current word list
     const handleManualGenerate = async () => {
@@ -275,9 +249,9 @@ const ActionModal: React.FC<ActionModalProps> = ({
             case 'blur': return 'Blur Object';
             case 'pixelate': return 'Pixelate Object';
             case 'mask': return 'Highlight Object (Mask Overlay)';
-            case 'replace-pika': return 'Replace with Pika Labs';
-            case 'replace-vace': return 'Replace with VACE';
-            case 'replace-runway': return 'Replace with Runway Gen-4';
+            case 'replace-pika': return 'Pika Inpainting';
+            case 'replace-vace': return 'VACE Inpainting';
+            case 'replace-runway': return 'Runway Gen-3 Refactor';
             case 'censor-beep': return 'Censor Audio (Beep)';
             case 'censor-dub': return 'Censor Audio (Voice Dub)';
             default: return 'Execute Action';
@@ -289,11 +263,11 @@ const ActionModal: React.FC<ActionModalProps> = ({
             case 'blur': return `Detect "${objectPrompt}" and apply Gaussian blur.`;
             case 'pixelate': return `Detect "${objectPrompt}" and apply pixelation.`;
             case 'mask': return `Highlight "${objectPrompt}" with a colored overlay.`;
-            case 'replace-pika': return `Replace "${objectPrompt}" using Pika Labs.`;
-            case 'replace-vace': return `Replace "${objectPrompt}" using VACE inpainting.`;
-            case 'replace-runway': return `Replace "${objectPrompt}" using Runway Gen-4.`;
-            case 'censor-beep': return `Detect profanity and overlay beep sounds (fast & free).`;
-            case 'censor-dub': return `Detect profanity and replace with clean voice dubs (premium).`;
+            case 'replace-pika': return `Execute generative inpainting on "${objectPrompt}" via Pika.`;
+            case 'replace-vace': return `Execute VACE-based remediation on "${objectPrompt}".`;
+            case 'replace-runway': return `Execute Runway Gen-3 refactor on "${objectPrompt}".`;
+            case 'censor-beep': return `Apply frequency-based audio masking to detected profanity.`;
+            case 'censor-dub': return `Apply neural voice synthesis to remediate detected profanity.`;
             default: return '';
         }
     };
@@ -307,7 +281,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
             <div className="relative z-10 w-full max-w-md bg-card border border-border rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between p-4 border-b border-border bg-muted/20">
-                    <h2 className="font-bold text-lg flex items-center gap-2">
+                    <h2 className="font-semibold text-lg flex items-center gap-2">
                         {actionType.includes('replace') ? <RefreshCw className="w-5 h-5 text-accent" /> : <EyeOff className="w-5 h-5 text-accent" />}
                         {getTitle()}
                     </h2>
@@ -322,7 +296,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                     {/* Object Prompt Section */}
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
-                            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                                 Target Object
                                 {status === 'detecting' && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
                             </label>
@@ -410,7 +384,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                             {actionType === 'replace-runway' && startTime !== undefined && endTime !== undefined && (
                                 <div className="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
                                     <div className="flex items-center gap-2 mb-2">
-                                        <span className="text-xs font-bold text-purple-400">🚀 Smart Clipping Active</span>
+                                        <span className="text-xs font-semibold text-purple-400">Smart Clipping Active</span>
                                     </div>
                                     <div className="flex gap-4 text-sm">
                                         <div className="flex items-center gap-2">
@@ -433,7 +407,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                     {actionType === 'censor-dub' && (
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
-                                <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                                     <Sparkles className="w-3 h-3 text-violet-400" />
                                     AI-Powered Word Replacement
                                 </label>
@@ -532,14 +506,16 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                     ))}
                                 </div>
                             )}
-                            <div className="p-2 bg-violet-500/10 border border-violet-500/20 rounded-lg">
-                                <p className="text-xs text-violet-300 flex items-start gap-2">
-                                    <Sparkles className="w-4 h-4 shrink-0 mt-0.5" />
-                                    <span>
-                                        Type your own replacement or click <strong>Generate</strong> for Gemini AI suggestions.
-                                        Click any suggestion chip to quickly use it.
+                            <div className="p-2.5 bg-secondary/30 border border-border rounded flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <Sparkles className="w-3.5 h-3.5 text-primary/40" />
+                                    <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground/60">
+                                        Suggestion Engine Active
                                     </span>
-                                </p>
+                                </div>
+                                <span className="text-[10px] font-semibold text-muted-foreground/40 italic">
+                                    Override or generate alternatives
+                                </span>
                             </div>
                         </div>
                     )}
@@ -553,9 +529,9 @@ const ActionModal: React.FC<ActionModalProps> = ({
                     )}
 
                     {status === 'completed' && (
-                        <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm animate-in slide-in-from-top-2">
-                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            Action completed successfully!
+                        <div className="flex items-center gap-2 p-3 bg-emerald-500/5 border border-emerald-500/10 rounded text-emerald-500/80 text-xs font-semibold uppercase tracking-wider animate-in slide-in-from-top-2">
+                            <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            Operation Complete
                         </div>
                     )}
                 </div>
