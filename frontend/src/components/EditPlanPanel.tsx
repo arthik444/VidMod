@@ -717,8 +717,8 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
             {/* Batch Review Modal */}
             {showBatchReviewModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-background/40 backdrop-blur-md animate-in fade-in duration-300" onClick={() => setShowBatchReviewModal(false)} />
-                    <div className="relative z-10 w-full max-w-4xl max-h-[90vh] glass-panel shadow-[0_32px_64px_rgba(0,0,0,0.4)] overflow-hidden flex flex-col font-mono border-white/5 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="absolute inset-0 bg-[#030303]/95 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setShowBatchReviewModal(false)} />
+                    <div className="relative z-10 w-full max-w-4xl max-h-[90vh] bg-[#0a0a0c] border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.8)] rounded-[32px] overflow-hidden flex flex-col font-mono animate-in fade-in zoom-in-95 duration-200">
                         <div className="flex items-center justify-between p-5 border-b border-white/5 bg-white/[0.02]">
                             <h2 className="font-bold text-[11px] uppercase tracking-[0.2em] text-white/80">Batch Pipeline Configuration</h2>
                             <button onClick={() => setShowBatchReviewModal(false)} className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white transition-all">
@@ -728,153 +728,180 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
 
                         <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                             {batchConfigs.map((config, index) => (
-                                <div key={index} className={cn("p-5 border transition-all duration-300 rounded-2xl", config.selected ? "border-accent/40 bg-accent/[0.02] shadow-[0_4px_20px_rgba(59,130,246,0.05)]" : "border-white/5 bg-white/[0.01]")}>
-                                    <div className="flex items-start gap-5">
-                                        <div className="relative flex items-center justify-center mt-1">
-                                            <input
-                                                type="checkbox"
-                                                checked={config.selected}
-                                                onChange={(e) => {
-                                                    const updated = [...batchConfigs];
-                                                    updated[index].selected = e.target.checked;
-                                                    setBatchConfigs(updated);
-                                                }}
-                                                className="peer sr-only"
-                                            />
-                                            <div className="w-5 h-5 border border-white/10 rounded-md bg-white/2 peer-checked:bg-accent peer-checked:border-accent transition-all duration-200" />
-                                            <CheckCircle2 className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform duration-200" />
-                                        </div>
-
-                                        <div className="flex-1 space-y-4">
-                                            <div className="flex items-start justify-between gap-4">
-                                                <div className="flex-1 space-y-1.5">
-                                                    <div className="flex items-center gap-3 mb-2.5">
-                                                        <span className="text-[10px] font-bold text-accent uppercase tracking-[0.1em] px-2 py-0.5 bg-accent/10 rounded-md">{config.finding.type}</span>
-                                                        <span className="text-[10px] font-bold text-muted-foreground/30 tracking-[0.1em]">
-                                                            {Math.floor(config.finding.startTime / 60)}:{String(Math.floor(config.finding.startTime % 60)).padStart(2, '0')} - {Math.floor(config.finding.endTime / 60)}:{String(Math.floor(config.finding.endTime % 60)).padStart(2, '0')}
-                                                        </span>
-                                                    </div>
-
-                                                    <textarea
-                                                        value={config.prompt}
-                                                        onChange={(e) => {
-                                                            const updated = [...batchConfigs];
-                                                            updated[index].prompt = e.target.value;
-                                                            setBatchConfigs(updated);
-                                                        }}
-                                                        className="w-full px-4 py-3 text-[11px] bg-white/[0.02] border border-white/5 rounded-xl focus:outline-none focus:border-accent/40 focus:bg-white/[0.04] resize-none font-mono text-foreground/80 transition-all"
-                                                        rows={2}
-                                                    />
-
-                                                    <div className="mt-4 grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[9px] uppercase font-bold text-muted-foreground/30 tracking-widest pl-1">Start Threshold (s)</label>
-                                                            <input
-                                                                type="number"
-                                                                value={config.startTime}
-                                                                onChange={(e) => {
-                                                                    const updated = [...batchConfigs];
-                                                                    updated[index].startTime = parseFloat(e.target.value) || 0;
-                                                                    setBatchConfigs(updated);
-                                                                }}
-                                                                step="0.1"
-                                                                className="w-full px-3 py-2 text-[11px] bg-white/[0.02] border border-white/5 rounded-xl focus:outline-none focus:border-accent/40 font-mono"
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1.5">
-                                                            <label className="text-[9px] uppercase font-bold text-muted-foreground/30 tracking-widest pl-1">End Threshold (s)</label>
-                                                            <input
-                                                                type="number"
-                                                                value={config.endTime}
-                                                                onChange={(e) => {
-                                                                    const updated = [...batchConfigs];
-                                                                    updated[index].endTime = parseFloat(e.target.value) || config.startTime;
-                                                                    setBatchConfigs(updated);
-                                                                }}
-                                                                step="0.1"
-                                                                className="w-full px-3 py-2 text-[11px] bg-white/[0.02] border border-white/5 rounded-xl focus:outline-none focus:border-accent/40 font-mono"
-                                                            />
-                                                        </div>
-                                                    </div>
-
-                                                    {(config.endTime - config.startTime) > 15 && (
-                                                        <div className="mt-3 flex items-center gap-2 p-2 bg-amber-500/5 border border-amber-500/20 rounded">
-                                                            <AlertCircle className="w-3 h-3 text-amber-500/60" />
-                                                            <span className="text-[9px] text-amber-500/80 font-semibold uppercase tracking-wider">Extended duration Detected</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex flex-col gap-2 shrink-0">
-                                                    {/* Show different actions based on finding type */}
-                                                    {(config.finding.type?.toLowerCase().includes('profanity') ||
-                                                        config.finding.type?.toLowerCase().includes('strong language') ||
-                                                        config.finding.type?.toLowerCase().includes('offensive') ||
-                                                        config.finding.type?.toLowerCase().includes('language') ||
-                                                        config.finding.category === 'language') ? (
-                                                        // Audio actions for Profanity
-                                                        ['censor-beep', 'censor-dub'].map((type) => (
-                                                            <button
-                                                                key={type}
-                                                                onClick={() => {
-                                                                    const updated = [...batchConfigs];
-                                                                    updated[index].effectType = type as any;
-                                                                    setBatchConfigs(updated);
-                                                                }}
-                                                                className={cn(
-                                                                    "px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-[0.15em] border transition-all duration-300",
-                                                                    config.effectType === type
-                                                                        ? "bg-accent/10 border-accent/40 text-accent shadow-[0_0_15px_rgba(59,130,246,0.1)]"
-                                                                        : "bg-white/[0.02] border-white/5 text-muted-foreground/30 hover:text-muted-foreground hover:border-white/10"
-                                                                )}
-                                                            >
-                                                                {type.replace('censor-', '').toUpperCase()}
-                                                            </button>
-                                                        ))
-                                                    ) : (
-                                                        // Visual actions for other findings
-                                                        ['blur', 'pixelate', 'replace-runway'].map((type) => (
-                                                            <button
-                                                                key={type}
-                                                                onClick={() => {
-                                                                    const updated = [...batchConfigs];
-                                                                    updated[index].effectType = type as any;
-                                                                    setBatchConfigs(updated);
-                                                                }}
-                                                                className={cn(
-                                                                    "px-4 py-2 rounded-xl text-[9px] font-bold uppercase tracking-[0.15em] border transition-all duration-300",
-                                                                    config.effectType === type
-                                                                        ? "bg-accent/10 border-accent/40 text-accent shadow-[0_0_15px_rgba(59,130,246,0.1)]"
-                                                                        : "bg-white/[0.02] border-white/5 text-muted-foreground/30 hover:text-muted-foreground hover:border-white/10"
-                                                                )}
-                                                            >
-                                                                {type.replace('replace-', '').toUpperCase()}
-                                                            </button>
-                                                        ))
-                                                    )}
-                                                </div>
+                                <div
+                                    key={index}
+                                    className={cn(
+                                        "p-6 border transition-all duration-200 rounded-[20px] space-y-5 group",
+                                        config.selected
+                                            ? "border-accent/40 bg-[#111114] shadow-[0_16px_48px_rgba(0,0,0,0.6)]"
+                                            : "border-white/5 bg-[#0c0c0e] hover:border-white/10"
+                                    )}
+                                >
+                                    {/* Header: Detection Type + Timestamp */}
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative flex items-center justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={config.selected}
+                                                    onChange={(e) => {
+                                                        const updated = [...batchConfigs];
+                                                        updated[index].selected = e.target.checked;
+                                                        setBatchConfigs(updated);
+                                                    }}
+                                                    className="peer sr-only"
+                                                />
+                                                <div className="w-5 h-5 border border-white/10 rounded-lg bg-[#050505] peer-checked:bg-accent peer-checked:border-accent transition-all duration-200" />
+                                                <CheckCircle2 className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform duration-200" />
                                             </div>
-
-                                            {config.effectType === 'replace-runway' && (
-                                                <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-                                                    <label className="text-[9px] uppercase font-bold text-accent/60 tracking-widest px-1 block">
-                                                        Synthesis Target Description
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        value={config.replacementPrompt}
-                                                        onChange={(e) => {
-                                                            const updated = [...batchConfigs];
-                                                            updated[index].replacementPrompt = e.target.value;
-                                                            setBatchConfigs(updated);
-                                                        }}
-                                                        placeholder="Describe synthetic replacement..."
-                                                        className="w-full px-4 py-2.5 text-[11px] bg-white/[0.02] border border-white/5 rounded-xl focus:outline-none focus:border-accent/40 font-mono text-accent/80 transition-all placeholder:text-muted-foreground/10"
-                                                    />
-                                                </div>
-                                            )}
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-accent uppercase tracking-[0.15em]">
+                                                    {config.finding.type}
+                                                </span>
+                                                <span className="text-[9px] font-medium text-muted-foreground/30 uppercase tracking-wider">
+                                                    Compliance Detection Segment
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="px-3 py-1 bg-[#050505] border border-white/5 rounded-lg flex items-center gap-2 text-[10px] font-bold text-muted-foreground/60 font-mono">
+                                            <Play className="w-3 h-3 text-accent/40" />
+                                            {Math.floor(config.finding.startTime / 60)}:{String(Math.floor(config.finding.startTime % 60)).padStart(2, '0')} - {Math.floor(config.finding.endTime / 60)}:{String(Math.floor(config.finding.endTime % 60)).padStart(2, '0')}
                                         </div>
                                     </div>
+
+                                    {/* Violation Content - High Contrast Minimalism */}
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2 px-1">
+                                            <div className="w-1 h-3 bg-red-500/40 rounded-full" />
+                                            <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground/40">Raw Detection Data</span>
+                                        </div>
+                                        <textarea
+                                            value={config.prompt}
+                                            onChange={(e) => {
+                                                const updated = [...batchConfigs];
+                                                updated[index].prompt = e.target.value;
+                                                setBatchConfigs(updated);
+                                            }}
+                                            className="w-full px-4 py-3 text-[11px] bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-red-500/30 resize-none font-mono text-foreground/70 transition-all leading-relaxed"
+                                            rows={2}
+                                        />
+                                    </div>
+
+                                    {/* Remediation Parameters */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[9px] uppercase font-bold text-muted-foreground/20 tracking-widest pl-1">Start Bound (s)</label>
+                                            <input
+                                                type="number"
+                                                value={config.startTime}
+                                                onChange={(e) => {
+                                                    const updated = [...batchConfigs];
+                                                    updated[index].startTime = parseFloat(e.target.value) || 0;
+                                                    setBatchConfigs(updated);
+                                                }}
+                                                step="0.1"
+                                                className="w-full px-3 py-2 text-[11px] bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-accent/40 font-mono text-foreground/80"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[9px] uppercase font-bold text-muted-foreground/20 tracking-widest pl-1">End Bound (s)</label>
+                                            <input
+                                                type="number"
+                                                value={config.endTime}
+                                                onChange={(e) => {
+                                                    const updated = [...batchConfigs];
+                                                    updated[index].endTime = parseFloat(e.target.value) || config.startTime;
+                                                    setBatchConfigs(updated);
+                                                }}
+                                                step="0.1"
+                                                className="w-full px-3 py-2 text-[11px] bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-accent/40 font-mono text-foreground/80"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Action Selector Bar - Solid Elements */}
+                                    <div className="pt-4 border-t border-white/5 flex items-center justify-between">
+                                        <div className="flex gap-1.5">
+                                            {(config.finding.type?.toLowerCase().includes('profanity') ||
+                                                config.finding.type?.toLowerCase().includes('strong language') ||
+                                                config.finding.type?.toLowerCase().includes('offensive') ||
+                                                config.finding.type?.toLowerCase().includes('language') ||
+                                                config.finding.category === 'language') ? (
+                                                ['censor-beep', 'censor-dub'].map((type) => (
+                                                    <button
+                                                        key={type}
+                                                        onClick={() => {
+                                                            const updated = [...batchConfigs];
+                                                            updated[index].effectType = type as any;
+                                                            setBatchConfigs(updated);
+                                                        }}
+                                                        className={cn(
+                                                            "px-4 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all duration-200",
+                                                            config.effectType === type
+                                                                ? "bg-accent text-white border-accent"
+                                                                : "bg-[#050505] border-white/5 text-muted-foreground/40 hover:text-white hover:border-white/20"
+                                                        )}
+                                                    >
+                                                        {type.replace('censor-', '')}
+                                                    </button>
+                                                ))
+                                            ) : (
+                                                ['blur', 'pixelate', 'replace-runway'].map((type) => (
+                                                    <button
+                                                        key={type}
+                                                        onClick={() => {
+                                                            const updated = [...batchConfigs];
+                                                            updated[index].effectType = type as any;
+                                                            setBatchConfigs(updated);
+                                                        }}
+                                                        className={cn(
+                                                            "px-4 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all duration-200",
+                                                            config.effectType === type
+                                                                ? "bg-accent text-white border-accent"
+                                                                : "bg-[#050505] border-white/5 text-muted-foreground/40 hover:text-white hover:border-white/20"
+                                                        )}
+                                                    >
+                                                        {type.replace('replace-', '')}
+                                                    </button>
+                                                ))
+                                            )}
+                                        </div>
+
+                                        {config.effectType === 'replace-runway' && (
+                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-accent/10 border border-accent/20 rounded-lg">
+                                                <Sparkles className="w-3 h-3 text-accent" />
+                                                <span className="text-[9px] font-bold uppercase tracking-wider text-accent">Active Synthesis</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Action Content Box */}
+                                    {config.effectType === 'replace-runway' && (
+                                        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+                                            <div className="p-4 bg-[#050505] border border-white/5 rounded-2xl space-y-2">
+                                                <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-accent/60 block px-1">Synthesis Logic Script</span>
+                                                <input
+                                                    type="text"
+                                                    value={config.replacementPrompt}
+                                                    onChange={(e) => {
+                                                        const updated = [...batchConfigs];
+                                                        updated[index].replacementPrompt = e.target.value;
+                                                        setBatchConfigs(updated);
+                                                    }}
+                                                    placeholder="Input replacement context..."
+                                                    className="w-full px-3 py-2 text-[11px] bg-transparent border-b border-white/10 focus:outline-none focus:border-accent/40 font-mono text-accent transition-all placeholder:text-muted-foreground/5"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Critical Duration Warning */}
+                                    {(config.endTime - config.startTime) > 15 && (
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-red-500/5 border border-red-500/10 rounded-xl">
+                                            <AlertCircle className="w-3.5 h-3.5 text-red-500/40" />
+                                            <span className="text-[9px] text-red-500/60 font-bold uppercase tracking-widest">Temporal Bound Overflow (15s+)</span>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
