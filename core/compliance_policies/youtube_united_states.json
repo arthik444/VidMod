@@ -4,7 +4,6 @@
   "version": "1.0",
   "last_updated": "2026-02-01",
   "source": "YouTube Community Guidelines, FCC Guidelines, MPAA Rating System",
-  
   "ratings": {
     "Kids (G)": {
       "description": "Content suitable for all ages, including young children. Must be appropriate for unsupervised viewing by minors.",
@@ -21,7 +20,7 @@
         "Bullying, harassment, or mean-spirited behavior",
         "Dangerous activities that could be imitated",
         "Political or controversial topics",
-        "Advertisements for age-restricted products"
+        "Advertisements for age-restricted products."
       ],
       "restricted": [
         "Mild conflict between characters (must be resolved positively)",
@@ -34,7 +33,6 @@
         "Age-appropriate vocabulary and concepts"
       ]
     },
-    
     "Teens (PG-13)": {
       "description": "Content suitable for teenagers 13+. May contain moderate mature themes but nothing explicit.",
       "prohibited": [
@@ -66,7 +64,6 @@
         "Negative behaviors should not be glorified"
       ]
     },
-    
     "Adult (R)": {
       "description": "Content for viewers 18+. May contain mature themes but must comply with platform policies.",
       "prohibited": [
@@ -99,11 +96,28 @@
       ]
     }
   },
-  
   "content_categories": {
     "violence": {
       "description": "Physical harm, fighting, weapons, or threatening behavior",
-      "detection_keywords": ["fight", "punch", "kick", "gun", "knife", "weapon", "blood", "death", "kill", "shoot", "stab", "attack", "assault", "beat", "hurt", "injure", "wound"],
+      "detection_keywords": [
+        "fight",
+        "punch",
+        "kick",
+        "gun",
+        "knife",
+        "weapon",
+        "blood",
+        "death",
+        "kill",
+        "shoot",
+        "stab",
+        "attack",
+        "assault",
+        "beat",
+        "hurt",
+        "injure",
+        "wound"
+      ],
       "severity_levels": {
         "mild": "Cartoon violence, slapstick, minor physical comedy",
         "moderate": "Action violence, fighting without gore, weapon display",
@@ -112,7 +126,21 @@
     },
     "profanity": {
       "description": "Offensive language, swearing, slurs, or crude expressions",
-      "detection_keywords": ["fuck", "shit", "damn", "ass", "bitch", "bastard", "hell", "crap", "dick", "pussy", "cock", "slut", "whore"],
+      "detection_keywords": [
+        "fuck",
+        "shit",
+        "damn",
+        "ass",
+        "bitch",
+        "bastard",
+        "hell",
+        "crap",
+        "dick",
+        "pussy",
+        "cock",
+        "slut",
+        "whore"
+      ],
       "severity_levels": {
         "mild": "Damn, hell, crap, butt, sucks",
         "moderate": "Shit, ass, bitch, bastard, piss",
@@ -121,7 +149,24 @@
     },
     "alcohol": {
       "description": "Alcoholic beverages, drinking, bars, or alcohol brands",
-      "detection_keywords": ["beer", "wine", "vodka", "whiskey", "bourbon", "rum", "tequila", "cocktail", "drunk", "drinking", "bar", "pub", "alcohol", "liquor", "champagne", "shots"],
+      "detection_keywords": [
+        "beer",
+        "wine",
+        "vodka",
+        "whiskey",
+        "bourbon",
+        "rum",
+        "tequila",
+        "cocktail",
+        "drunk",
+        "drinking",
+        "bar",
+        "pub",
+        "alcohol",
+        "liquor",
+        "champagne",
+        "shots"
+      ],
       "severity_levels": {
         "mild": "Alcohol visible in background",
         "moderate": "Characters holding/drinking alcohol",
@@ -130,7 +175,19 @@
     },
     "tobacco": {
       "description": "Cigarettes, cigars, vaping, or tobacco products",
-      "detection_keywords": ["cigarette", "smoking", "vape", "vaping", "cigar", "tobacco", "smoke", "lighter", "ashtray", "e-cigarette", "nicotine"],
+      "detection_keywords": [
+        "cigarette",
+        "smoking",
+        "vape",
+        "vaping",
+        "cigar",
+        "tobacco",
+        "smoke",
+        "lighter",
+        "ashtray",
+        "e-cigarette",
+        "nicotine"
+      ],
       "severity_levels": {
         "mild": "Tobacco products visible",
         "moderate": "Characters smoking/vaping",
@@ -139,7 +196,23 @@
     },
     "drugs": {
       "description": "Illegal drugs, prescription drug abuse, or drug paraphernalia",
-      "detection_keywords": ["drugs", "marijuana", "weed", "cocaine", "heroin", "meth", "pills", "high", "stoned", "needle", "syringe", "bong", "joint", "pot", "overdose"],
+      "detection_keywords": [
+        "drugs",
+        "marijuana",
+        "weed",
+        "cocaine",
+        "heroin",
+        "meth",
+        "pills",
+        "high",
+        "stoned",
+        "needle",
+        "syringe",
+        "bong",
+        "joint",
+        "pot",
+        "overdose"
+      ],
       "severity_levels": {
         "mild": "Reference to drugs in educational context",
         "moderate": "Drug imagery without use shown",
@@ -148,7 +221,21 @@
     },
     "sexual_content": {
       "description": "Romantic content, suggestive behavior, or nudity",
-      "detection_keywords": ["kiss", "nude", "naked", "sex", "sexual", "romantic", "intimate", "provocative", "revealing", "bikini", "underwear", "seductive", "sensual"],
+      "detection_keywords": [
+        "kiss",
+        "nude",
+        "naked",
+        "sex",
+        "sexual",
+        "romantic",
+        "intimate",
+        "provocative",
+        "revealing",
+        "bikini",
+        "underwear",
+        "seductive",
+        "sensual"
+      ],
       "severity_levels": {
         "mild": "Brief kissing, romantic hand-holding",
         "moderate": "Extended kissing, suggestive clothing, implied intimacy",
@@ -157,7 +244,19 @@
     },
     "gambling": {
       "description": "Betting, casinos, lotteries, or gambling promotion",
-      "detection_keywords": ["casino", "gambling", "bet", "betting", "lottery", "poker", "slots", "jackpot", "wager", "odds", "bookmaker"],
+      "detection_keywords": [
+        "casino",
+        "gambling",
+        "bet",
+        "betting",
+        "lottery",
+        "poker",
+        "slots",
+        "jackpot",
+        "wager",
+        "odds",
+        "bookmaker"
+      ],
       "severity_levels": {
         "mild": "Gambling referenced in passing",
         "moderate": "Gambling shown without promotion",
@@ -165,7 +264,6 @@
       }
     }
   },
-  
   "platform_specific_rules": [
     "Made for Kids content is subject to COPPA regulations",
     "Ads on kids content are limited by FTC guidelines",
