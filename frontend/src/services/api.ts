@@ -89,10 +89,29 @@ export async function uploadVideo(file: File): Promise<VideoUploadResponse> {
 }
 
 /**
- * Analyze video with Gemini for compliance violations
+ * Analyze video with Gemini for compliance violations.
+ * 
+ * @param jobId - The job ID
+ * @param platform - Target platform (e.g., "YouTube")
+ * @param region - Target region (e.g., "Middle East", "United States")
+ * @param rating - Target rating (e.g., "Kids (G)", "Teens (PG-13)")
  */
-export async function analyzeVideo(jobId: string): Promise<AnalysisResponse> {
-    const response = await fetch(`${API_BASE}/analyze-video/${jobId}`, {
+export async function analyzeVideo(
+    jobId: string,
+    platform?: string,
+    region?: string,
+    rating?: string
+): Promise<AnalysisResponse> {
+    // Build URL with query parameters for compliance policy
+    const params = new URLSearchParams();
+    if (platform) params.append('platform', platform);
+    if (region) params.append('region', region);
+    if (rating) params.append('rating', rating);
+
+    const queryString = params.toString();
+    const url = `${API_BASE}/analyze-video/${jobId}${queryString ? '?' + queryString : ''}`;
+
+    const response = await fetch(url, {
         method: 'POST',
     });
 

@@ -15,6 +15,7 @@ export type Rating = typeof Rating[keyof typeof Rating];
 
 export const Region = {
     Global: 'Global',
+    UnitedStates: 'United States',
     MiddleEast: 'Middle East',
     EastAsia: 'East Asia',
     Europe: 'Europe',

@@ -1299,18 +1299,22 @@ async def delete_job(
 @router.post("/analyze-video/{job_id}")
 async def analyze_video(
     job_id: str,
+    platform: Optional[str] = None,
+    region: Optional[str] = None,
+    rating: Optional[str] = None,
     pipeline: VideoPipeline = Depends(get_pipeline),
     settings: Settings = Depends(get_settings)
 ):
     """
-    Analyze video with Gemini 2.5 Pro for compliance violations.
+    Analyze video with Gemini for compliance violations.
     
-    Uses native video understanding to detect:
-    - Alcohol/substance use
-    - Brand logos
-    - Violence
-    - Profanity/language
-    - Other compliance issues
+    Uses native video understanding to detect compliance issues based on
+    the provided platform, region, and rating compliance policies.
+    
+    Query Parameters:
+        platform: Target platform (e.g., "YouTube")
+        region: Target region (e.g., "Middle East", "United States")
+        rating: Target rating (e.g., "Kids (G)", "Teens (PG-13)", "Adult (R)")
     
     Returns findings matching the frontend Finding type.
     """
@@ -1325,9 +1329,17 @@ async def analyze_video(
     
     try:
         logger.info(f"Starting Gemini analysis for job {job_id}")
+        if platform and region and rating:
+            logger.info(f"Using compliance policy: {platform}/{region}/{rating}")
         
-        # Analyze with Gemini
-        result = analyzeVideoWithGemini(job.video_path, api_key=settings.gemini_api_key)
+        # Analyze with Gemini (with compliance policy if provided)
+        result = analyzeVideoWithGemini(
+            job.video_path, 
+            api_key=settings.gemini_api_key,
+            platform=platform,
+            region=region,
+            rating=rating
+        )
         
         # Add IDs to findings
         findings = result.get("findings", [])

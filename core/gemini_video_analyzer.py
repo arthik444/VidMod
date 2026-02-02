@@ -55,22 +55,28 @@ VIDEO_ANALYSIS_SCHEMA = {
 }
 
 
-ANALYSIS_PROMPT = """You are a video compliance analyzer. Analyze this video to identify content that may require moderation or editing for platform compliance.
+# Base analysis prompt - will be augmented with compliance policy
+BASE_ANALYSIS_PROMPT = """You are a video compliance analyzer. Analyze this video to identify content that may require moderation or editing for platform compliance.
+
+{compliance_policy}
 
 ## Your Task:
-Identify and report any instances of:
-1. **Alcohol/Substances**: Beer, wine, liquor, cigarettes, vaping, drugs
-2. **Brand Logos**: Unauthorized brand exposure, product placements  
-3. **Violence**: Fighting, weapons, aggressive behavior
-4. **Language**: Profanity, hate speech, explicit content
-5. **Other**: Sensitive content, copyright issues, inappropriate gestures
+Based on the compliance policy above, identify and report any instances of:
+1. **PROHIBITED content** - Mark as 'critical' status
+2. **RESTRICTED content** - Mark as 'warning' status
+3. **Alcohol/Substances**: Beer, wine, liquor, cigarettes, vaping, drugs
+4. **Brand Logos**: Unauthorized brand exposure, product placements  
+5. **Violence**: Fighting, weapons, aggressive behavior
+6. **Language**: Profanity, hate speech, explicit content
+7. **Other**: Sensitive content, copyright issues, inappropriate gestures
 
 ## IMPORTANT INSTRUCTIONS:
+- **USE THE COMPLIANCE POLICY** - Flag content based on the documented rules, not guessing
 - Focus on ACTIONS not just object presence (e.g., "person drinking beer" vs "beer bottle visible")
 - Track WHEN violations occur with precise timestamps
 - Estimate bounding box positions (top/left/width/height as percentages)
-- Assign appropriate severity: 'critical' for major violations, 'warning' for minor/potential issues
-- Provide context explaining WHY this is a compliance concern
+- Assign severity based on policy: 'critical' for PROHIBITED content, 'warning' for RESTRICTED
+- Reference which policy rule was violated in the context
 - Suggest appropriate remediation actions (blur, mute, cut, replace)
 
 ## Response Requirements:
@@ -82,6 +88,13 @@ Identify and report any instances of:
 If no compliance issues are found, return an empty findings array with an appropriate summary.
 
 Analyze the video now and return structured JSON."""
+
+# Fallback prompt when no policy is available
+FALLBACK_POLICY = """## GENERAL COMPLIANCE GUIDELINES
+No specific policy loaded. Use general content moderation guidelines:
+- Flag violence, profanity, alcohol, tobacco, drugs, sexual content
+- Consider audience age appropriateness
+- Note any potentially controversial content"""
 
 
 class GeminiVideoAnalyzer:
@@ -106,12 +119,21 @@ class GeminiVideoAnalyzer:
         self.client = genai.Client(api_key=self.api_key)
         logger.info("Gemini Video Analyzer initialized")
     
-    def analyze(self, video_path: str | Path) -> Dict[str, Any]:
+    def analyze(
+        self, 
+        video_path: str | Path,
+        platform: str = None,
+        region: str = None,
+        rating: str = None
+    ) -> Dict[str, Any]:
         """
         Analyze a video for compliance violations.
         
         Args:
             video_path: Path to the video file
+            platform: Target platform (e.g., "YouTube")
+            region: Target region (e.g., "Middle East", "United States")
+            rating: Target rating (e.g., "Kids (G)", "Teens (PG-13)", "Adult (R)")
             
         Returns:
             Dict containing findings, summary, riskLevel, predictedAgeRating
@@ -121,6 +143,17 @@ class GeminiVideoAnalyzer:
         video_path = Path(video_path)
         if not video_path.exists():
             raise FileNotFoundError(f"Video file not found: {video_path}")
+        
+        # Build the analysis prompt with compliance policy
+        if platform and region and rating:
+            from core.policy_loader import format_policy_for_prompt
+            policy_text = format_policy_for_prompt(platform, region, rating)
+            logger.info(f"Using compliance policy: {platform}/{region}/{rating}")
+        else:
+            policy_text = FALLBACK_POLICY
+            logger.info("No compliance parameters provided, using general guidelines")
+        
+        analysis_prompt = BASE_ANALYSIS_PROMPT.format(compliance_policy=policy_text)
         
         logger.info(f"Analyzing video with Gemini: {video_path}")
         
@@ -151,7 +184,7 @@ class GeminiVideoAnalyzer:
                                 file_uri=video_file.uri,
                                 mime_type=video_file.mime_type
                             ),
-                            types.Part.from_text(text=ANALYSIS_PROMPT)
+                            types.Part.from_text(text=analysis_prompt)
                         ]
                     )
                 ],
@@ -250,16 +283,24 @@ class GeminiVideoAnalyzer:
 
 def analyzeVideoWithGemini(
     videoFilePath: str | Path,
-    api_key: Optional[str] = None
+    api_key: Optional[str] = None,
+    platform: Optional[str] = None,
+    region: Optional[str] = None,
+    rating: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Analyze a video for compliance violations using Gemini 2.5 Pro.
     
-    This is the main entry point function for video analysis.
+    This is the main entry point function for video analysis. When platform,
+    region, and rating are provided, uses grounded compliance policies for
+    accurate, factual violation detection.
     
     Args:
         videoFilePath: Path to the video file to analyze
         api_key: Optional Gemini API key (uses GEMINI_API_KEY env var if not provided)
+        platform: Target platform (e.g., "YouTube", "TikTok")
+        region: Target region (e.g., "Middle East", "United States")
+        rating: Target audience rating (e.g., "Kids (G)", "Teens (PG-13)")
         
     Returns:
         Dict containing:
@@ -269,10 +310,20 @@ def analyzeVideoWithGemini(
         - predictedAgeRating: Suggested age rating (U, 12+, 18+, etc.)
         
     Example:
-        >>> result = analyzeVideoWithGemini("/path/to/video.mp4")
+        >>> result = analyzeVideoWithGemini(
+        ...     "/path/to/video.mp4",
+        ...     platform="YouTube",
+        ...     region="Middle East",
+        ...     rating="Teens (PG-13)"
+        ... )
         >>> print(f"Risk Level: {result['riskLevel']}")
         >>> for finding in result["findings"]:
         ...     print(f"{finding['startTime']}s: {finding['content']}")
     """
     analyzer = GeminiVideoAnalyzer(api_key=api_key)
-    return analyzer.analyze(videoFilePath)
+    return analyzer.analyze(
+        videoFilePath,
+        platform=platform,
+        region=region,
+        rating=rating
+    )

@@ -90,8 +90,13 @@ const AppLayout: React.FC = () => {
         setActiveTab('Analysis');
         setIsAnalyzing(true);
         try {
-            // Call the Gemini analysis API
-            const response = await fetch(`http://localhost:8000/api/analyze-video/${uploadedJobId}`, {
+            // Call the Gemini analysis API with compliance parameters
+            const params = new URLSearchParams();
+            params.append('platform', platform);
+            params.append('region', region);
+            params.append('rating', rating);
+
+            const response = await fetch(`http://localhost:8000/api/analyze-video/${uploadedJobId}?${params.toString()}`, {
                 method: 'POST',
             });
 
@@ -136,7 +141,13 @@ const AppLayout: React.FC = () => {
         setIsAnalyzing(true);
 
         try {
-            const response = await fetch(`http://localhost:8000/api/analyze-video/${jobId}`, {
+            // Analyze with compliance parameters
+            const params = new URLSearchParams();
+            params.append('platform', platform);
+            params.append('region', region);
+            params.append('rating', rating);
+
+            const response = await fetch(`http://localhost:8000/api/analyze-video/${jobId}?${params.toString()}`, {
                 method: 'POST',
             });
 
