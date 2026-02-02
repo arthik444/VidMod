@@ -469,6 +469,17 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     Pixelate
                 </button>
             );
+            buttons.push(
+                <button
+                    key="replace-runway"
+                    onClick={(e) => handleApplyAction(step, 'replace-runway', e)}
+                    disabled={!jobId}
+                    className="flex items-center gap-1 px-2 py-1 bg-secondary/20 hover:bg-secondary/30 border border-border rounded text-[9px] font-bold uppercase transition-colors disabled:opacity-50"
+                >
+                    <RefreshCw className="w-3 h-3" />
+                    Runway
+                </button>
+            );
         }
 
         // Replace action - for replace or logo findings
@@ -740,7 +751,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                     {/* Header: Detection Type + Timestamp */}
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-3">
-                                            <div className="relative flex items-center justify-center">
+                                            <label className="relative flex items-center justify-center cursor-pointer">
                                                 <input
                                                     type="checkbox"
                                                     checked={config.selected}
@@ -753,7 +764,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                                 />
                                                 <div className="w-5 h-5 border border-white/10 rounded-lg bg-[#050505] peer-checked:bg-accent peer-checked:border-accent transition-all duration-200" />
                                                 <CheckCircle2 className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform duration-200" />
-                                            </div>
+                                            </label>
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-bold text-accent uppercase tracking-[0.15em]">
                                                     {config.finding.type}

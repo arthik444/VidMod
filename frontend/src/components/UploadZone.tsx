@@ -275,13 +275,16 @@ const UploadZone: React.FC<UploadZoneProps> = ({
                                                             <span className="font-semibold text-[10px] tracking-wider text-muted-foreground uppercase">{sel.value}</span>
                                                             <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50" />
                                                         </div>
-                                                        <div className="absolute bottom-full left-0 w-full mb-1 p-1 bg-secondary border border-border rounded shadow-xl opacity-0 scale-95 origin-bottom group-hover/sel:opacity-100 group-hover/sel:scale-100 pointer-events-none group-hover/sel:pointer-events-auto transition-all z-50">
-                                                            {sel.options.map(opt => (
-                                                                <button key={opt} onClick={() => sel.onChange(opt)} className="w-full flex items-center justify-between px-2 py-1.5 rounded text-[9px] font-semibold tracking-wider hover:bg-primary/10 transition-all text-muted-foreground hover:text-primary uppercase">
-                                                                    {opt}
-                                                                    {sel.value === opt && <Check className="w-3 h-3 text-primary" />}
-                                                                </button>
-                                                            ))}
+                                                        {/* Dropdown container with invisible padding to bridge the gap */}
+                                                        <div className="absolute bottom-full left-0 w-full pb-2 opacity-0 scale-95 origin-bottom group-hover/sel:opacity-100 group-hover/sel:scale-100 pointer-events-none group-hover/sel:pointer-events-auto transition-all z-50">
+                                                            <div className="p-1 bg-secondary border border-border rounded shadow-xl">
+                                                                {sel.options.map(opt => (
+                                                                    <button key={opt} onClick={() => sel.onChange(opt)} className="w-full flex items-center justify-between px-2 py-1.5 rounded text-[9px] font-semibold tracking-wider hover:bg-primary/10 transition-all text-muted-foreground hover:text-primary uppercase">
+                                                                        {opt}
+                                                                        {sel.value === opt && <Check className="w-3 h-3 text-primary" />}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>

@@ -1,0 +1,176 @@
+{
+  "platform": "YouTube",
+  "region": "United States",
+  "version": "1.0",
+  "last_updated": "2026-02-01",
+  "source": "YouTube Community Guidelines, FCC Guidelines, MPAA Rating System",
+  
+  "ratings": {
+    "Kids (G)": {
+      "description": "Content suitable for all ages, including young children. Must be appropriate for unsupervised viewing by minors.",
+      "prohibited": [
+        "Any form of violence, including cartoon violence with harmful intent",
+        "Any profanity, crude language, or offensive terminology",
+        "Alcohol, tobacco, vaping, or drug references/imagery",
+        "Gambling or betting references",
+        "Weapons or firearms (including toys that look realistic)",
+        "Scary, disturbing, or horror-themed content",
+        "Romantic or dating content",
+        "Suggestive clothing or behavior",
+        "Death, injury, or medical procedures",
+        "Bullying, harassment, or mean-spirited behavior",
+        "Dangerous activities that could be imitated",
+        "Political or controversial topics",
+        "Advertisements for age-restricted products"
+      ],
+      "restricted": [
+        "Mild conflict between characters (must be resolved positively)",
+        "Fantasy elements that may confuse young children",
+        "Loud or startling sounds/visuals"
+      ],
+      "requirements": [
+        "Educational or entertainment value for children",
+        "Positive messaging and role models",
+        "Age-appropriate vocabulary and concepts"
+      ]
+    },
+    
+    "Teens (PG-13)": {
+      "description": "Content suitable for teenagers 13+. May contain moderate mature themes but nothing explicit.",
+      "prohibited": [
+        "Explicit violence with gore, blood, or graphic injuries",
+        "Strong profanity (F-word, sexual slurs, hate speech)",
+        "Drug use or drug paraphernalia shown in positive light",
+        "Explicit sexual content or nudity",
+        "Graphic depictions of death or torture",
+        "Self-harm or suicide depicted in detail",
+        "Hate speech or discrimination",
+        "Instructions for dangerous/illegal activities",
+        "Hard drug references (heroin, cocaine, meth, etc.)",
+        "Gambling with real money"
+      ],
+      "restricted": [
+        "Mild profanity (damn, hell, ass) - should be infrequent",
+        "Alcohol consumption - should not glorify",
+        "Tobacco/vaping - should not promote",
+        "Stylized action violence without gore",
+        "Brief romantic content (kissing, dating)",
+        "Mild horror or suspense themes",
+        "References to marijuana in educational/news context",
+        "Cartoon or fantasy violence",
+        "Mild crude humor"
+      ],
+      "requirements": [
+        "Appropriate for teenage audience",
+        "Violence must have consequences shown",
+        "Negative behaviors should not be glorified"
+      ]
+    },
+    
+    "Adult (R)": {
+      "description": "Content for viewers 18+. May contain mature themes but must comply with platform policies.",
+      "prohibited": [
+        "Explicit sexual content or pornography",
+        "Real violence against people (assault, fights)",
+        "Content promoting terrorism or extremism",
+        "Hate speech targeting protected groups",
+        "Harassment or doxxing of individuals",
+        "Child exploitation or endangerment",
+        "Instructions for weapons/explosives/drugs",
+        "Non-consensual intimate imagery",
+        "Content promoting self-harm or suicide",
+        "Illegal activities shown approvingly",
+        "Animal abuse",
+        "Deceptive practices or scams"
+      ],
+      "restricted": [
+        "Strong profanity - allowed but not excessive",
+        "Violence in fictional contexts - allowed with age gate",
+        "Alcohol and tobacco use - allowed, not promoted",
+        "Drug references - allowed in educational/artistic context",
+        "Horror and disturbing imagery - allowed with warning",
+        "Gambling content - requires disclosure",
+        "Marijuana content - state/country dependent"
+      ],
+      "requirements": [
+        "Age-gate or restricted mode recommended",
+        "Content warnings for sensitive material",
+        "No monetization on extremely sensitive topics"
+      ]
+    }
+  },
+  
+  "content_categories": {
+    "violence": {
+      "description": "Physical harm, fighting, weapons, or threatening behavior",
+      "detection_keywords": ["fight", "punch", "kick", "gun", "knife", "weapon", "blood", "death", "kill", "shoot", "stab", "attack", "assault", "beat", "hurt", "injure", "wound"],
+      "severity_levels": {
+        "mild": "Cartoon violence, slapstick, minor physical comedy",
+        "moderate": "Action violence, fighting without gore, weapon display",
+        "severe": "Graphic violence, blood, gore, realistic harm"
+      }
+    },
+    "profanity": {
+      "description": "Offensive language, swearing, slurs, or crude expressions",
+      "detection_keywords": ["fuck", "shit", "damn", "ass", "bitch", "bastard", "hell", "crap", "dick", "pussy", "cock", "slut", "whore"],
+      "severity_levels": {
+        "mild": "Damn, hell, crap, butt, sucks",
+        "moderate": "Shit, ass, bitch, bastard, piss",
+        "severe": "F-word, C-word, sexual slurs, racial slurs, hate speech"
+      }
+    },
+    "alcohol": {
+      "description": "Alcoholic beverages, drinking, bars, or alcohol brands",
+      "detection_keywords": ["beer", "wine", "vodka", "whiskey", "bourbon", "rum", "tequila", "cocktail", "drunk", "drinking", "bar", "pub", "alcohol", "liquor", "champagne", "shots"],
+      "severity_levels": {
+        "mild": "Alcohol visible in background",
+        "moderate": "Characters holding/drinking alcohol",
+        "severe": "Intoxication, binge drinking, alcohol promotion"
+      }
+    },
+    "tobacco": {
+      "description": "Cigarettes, cigars, vaping, or tobacco products",
+      "detection_keywords": ["cigarette", "smoking", "vape", "vaping", "cigar", "tobacco", "smoke", "lighter", "ashtray", "e-cigarette", "nicotine"],
+      "severity_levels": {
+        "mild": "Tobacco products visible",
+        "moderate": "Characters smoking/vaping",
+        "severe": "Glamorization of smoking, tobacco advertising"
+      }
+    },
+    "drugs": {
+      "description": "Illegal drugs, prescription drug abuse, or drug paraphernalia",
+      "detection_keywords": ["drugs", "marijuana", "weed", "cocaine", "heroin", "meth", "pills", "high", "stoned", "needle", "syringe", "bong", "joint", "pot", "overdose"],
+      "severity_levels": {
+        "mild": "Reference to drugs in educational context",
+        "moderate": "Drug imagery without use shown",
+        "severe": "Drug use depicted, drug promotion"
+      }
+    },
+    "sexual_content": {
+      "description": "Romantic content, suggestive behavior, or nudity",
+      "detection_keywords": ["kiss", "nude", "naked", "sex", "sexual", "romantic", "intimate", "provocative", "revealing", "bikini", "underwear", "seductive", "sensual"],
+      "severity_levels": {
+        "mild": "Brief kissing, romantic hand-holding",
+        "moderate": "Extended kissing, suggestive clothing, implied intimacy",
+        "severe": "Nudity, sexual behavior, explicit content"
+      }
+    },
+    "gambling": {
+      "description": "Betting, casinos, lotteries, or gambling promotion",
+      "detection_keywords": ["casino", "gambling", "bet", "betting", "lottery", "poker", "slots", "jackpot", "wager", "odds", "bookmaker"],
+      "severity_levels": {
+        "mild": "Gambling referenced in passing",
+        "moderate": "Gambling shown without promotion",
+        "severe": "Gambling promotion, undisclosed sponsored content"
+      }
+    }
+  },
+  
+  "platform_specific_rules": [
+    "Made for Kids content is subject to COPPA regulations",
+    "Ads on kids content are limited by FTC guidelines",
+    "Age-restricted content cannot be monetized with all advertisers",
+    "Repeated violations may result in channel termination",
+    "Community Guidelines strikes affect channel standing"
+  ]
+}

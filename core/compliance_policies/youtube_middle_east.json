@@ -1,0 +1,364 @@
+{
+    "platform": "YouTube",
+    "region": "Middle East",
+    "version": "1.0",
+    "last_updated": "2026-02-01",
+    "source": "YouTube Community Guidelines, UAE Media Regulatory Office, Saudi GCAM, Regional Broadcasting Standards",
+    "notes": "Middle East region includes UAE, Saudi Arabia, Qatar, Kuwait, Bahrain, Oman, and similar markets. Additional restrictions apply beyond US guidelines.",
+    "ratings": {
+        "Kids (G)": {
+            "description": "Content suitable for all ages. Must comply with Islamic values and regional cultural norms.",
+            "prohibited": [
+                "Any form of violence, including cartoon violence",
+                "Any profanity in any language (including transliterated)",
+                "Alcohol, tobacco, or drug references in any form",
+                "Pork products or non-halal food emphasis",
+                "Gambling or games of chance references",
+                "Weapons or military imagery",
+                "Scary, horror, or supernatural content",
+                "Any romantic content including hand-holding",
+                "Immodest clothing (shorts above knee, sleeveless, swimwear)",
+                "Dogs as pets (culturally sensitive in some regions)",
+                "Music with inappropriate lyrics",
+                "Dance moves that are suggestive",
+                "Magic or sorcery themes",
+                "LGBTQ+ content or references",
+                "Political content or criticism of governments",
+                "Religious mockery or disrespect",
+                "Depictions of prophets or religious figures"
+            ],
+            "restricted": [
+                "Western holidays (Christmas, Halloween) - may need context",
+                "Non-Islamic religious practices - educational only",
+                "Fantasy creatures (djinn, magic) - cultural sensitivity required"
+            ],
+            "requirements": [
+                "Respect for Islamic values and traditions",
+                "Modest dress code for all characters",
+                "Family-friendly messaging",
+                "No content during prayer times (regional)"
+            ]
+        },
+        "Teens (PG-13)": {
+            "description": "Content for teenagers. Must respect cultural and religious values of the region.",
+            "prohibited": [
+                "Alcohol consumption or alcohol brands visible",
+                "Alcohol advertising of any kind",
+                "Tobacco or vaping shown in any context",
+                "Drug references of any kind",
+                "Violence with blood or realistic harm",
+                "Strong profanity in any language",
+                "Blasphemy or religious disrespect",
+                "Criticism of Islam or Islamic practices",
+                "Criticism of regional governments or royalty",
+                "LGBTQ+ content, themes, or characters",
+                "Dating or romantic relationships outside marriage context",
+                "Physical contact between unmarried individuals",
+                "Immodest clothing (revealing, tight-fitting)",
+                "Gambling or betting content",
+                "Pork or non-halal content promotion",
+                "Israeli flags, symbols, or pro-Israel content",
+                "Holocaust denial or antisemitic content",
+                "Content promoting atheism",
+                "Supernatural horror content",
+                "Suicide or self-harm references"
+            ],
+            "restricted": [
+                "Mild action violence in fictional/historical context",
+                "References to Western culture - context dependent",
+                "Music - must not have inappropriate lyrics",
+                "Mixed-gender interactions - must be professional only",
+                "Discussion of other religions - educational/respectful only",
+                "Historical content involving conflict - balanced presentation",
+                "Patriotic content from other nations"
+            ],
+            "requirements": [
+                "Cultural sensitivity to Islamic values",
+                "Modest presentation of all individuals",
+                "Respect for authority and family values",
+                "No normalization of Western dating culture"
+            ]
+        },
+        "Adult (R)": {
+            "description": "Content for viewers 18+. Still subject to strict regional and religious guidelines.",
+            "prohibited": [
+                "Alcohol advertising or promotion (STRICTLY PROHIBITED)",
+                "Alcohol consumption shown approvingly",
+                "Any sexual content or nudity",
+                "LGBTQ+ content of any kind",
+                "Blasphemy or criticism of Islam",
+                "Criticism of regional governments",
+                "Pornography or sexually suggestive content",
+                "Graphic violence against Muslims",
+                "Terrorism that involves Islamic imagery",
+                "Anti-Arabic or Islamophobic content",
+                "Political content about regional conflicts",
+                "Israeli content or normalization",
+                "Content promoting atheism or apostasy",
+                "Gambling promotion or casino content",
+                "Drug use or promotion",
+                "Pork products promotion",
+                "Witchcraft or black magic promotion",
+                "Defamation of religious scholars"
+            ],
+            "restricted": [
+                "Violence in news/documentary context - must be justified",
+                "Alcohol visible but not promoted - age-gated",
+                "Tobacco in historical context only",
+                "References to other religions - academic only",
+                "Discussion of regional politics - factual, balanced",
+                "Content about terrorism - anti-terrorism messaging required",
+                "Strong language - bleeped/censored only"
+            ],
+            "requirements": [
+                "Age verification for mature content",
+                "Respect for Islamic values even in adult content",
+                "No monetization on politically sensitive topics",
+                "Content warnings required for any violence"
+            ]
+        }
+    },
+    "content_categories": {
+        "alcohol": {
+            "description": "ALL alcohol content is highly restricted in Middle East",
+            "detection_keywords": [
+                "beer",
+                "wine",
+                "vodka",
+                "whiskey",
+                "bourbon",
+                "rum",
+                "tequila",
+                "cocktail",
+                "drunk",
+                "drinking",
+                "bar",
+                "pub",
+                "alcohol",
+                "liquor",
+                "champagne",
+                "shots",
+                "brewery",
+                "winery",
+                "spirits",
+                "booze"
+            ],
+            "regional_severity": "CRITICAL",
+            "notes": "Alcohol advertising is ILLEGAL. Even casual depiction may violate regulations.",
+            "severity_levels": {
+                "mild": "Alcohol visible in background - STILL FLAG",
+                "moderate": "Characters near alcohol - REMOVE",
+                "severe": "Consumption or promotion - PROHIBITED"
+            },
+            "action_required": "Flag for review/removal regardless of rating"
+        },
+        "tobacco": {
+            "description": "Tobacco and vaping strongly restricted",
+            "detection_keywords": [
+                "cigarette",
+                "smoking",
+                "vape",
+                "vaping",
+                "cigar",
+                "tobacco",
+                "smoke",
+                "shisha",
+                "hookah",
+                "narghile",
+                "e-cigarette"
+            ],
+            "regional_severity": "HIGH",
+            "notes": "Tobacco advertising banned. Hookah/shisha may have cultural context but discouraged.",
+            "severity_levels": {
+                "mild": "Tobacco visible",
+                "moderate": "Smoking shown",
+                "severe": "Promotion or glamorization"
+            }
+        },
+        "religious_content": {
+            "description": "Content involving religion, particularly Islam",
+            "detection_keywords": [
+                "allah",
+                "muhammad",
+                "prophet",
+                "quran",
+                "mosque",
+                "prayer",
+                "muslim",
+                "islam",
+                "ramadan",
+                "hajj",
+                "mecca",
+                "hijab",
+                "halal",
+                "haram",
+                "imam",
+                "sheikh",
+                "fatwa"
+            ],
+            "regional_severity": "CRITICAL",
+            "notes": "Must be respectful. No depiction of Prophet Muhammad. No mockery of Islamic practices.",
+            "severity_levels": {
+                "mild": "Respectful religious references",
+                "moderate": "Potentially insensitive presentation",
+                "severe": "Blasphemy, mockery, or defamation"
+            },
+            "action_required": "Expert review for any religious content"
+        },
+        "political_content": {
+            "description": "Content involving regional politics or governments",
+            "detection_keywords": [
+                "government",
+                "king",
+                "prince",
+                "royal",
+                "president",
+                "minister",
+                "parliament",
+                "election",
+                "protest",
+                "democracy",
+                "opposition",
+                "israel",
+                "palestine",
+                "iran",
+                "saudi",
+                "uae",
+                "qatar"
+            ],
+            "regional_severity": "HIGH",
+            "notes": "Criticism of regional governments may be illegal. Neutral presentation required.",
+            "severity_levels": {
+                "mild": "Factual news reporting",
+                "moderate": "Opinion content",
+                "severe": "Criticism or negative portrayal"
+            }
+        },
+        "modesty": {
+            "description": "Clothing and appearance standards",
+            "detection_keywords": [
+                "bikini",
+                "swimsuit",
+                "shorts",
+                "miniskirt",
+                "tank top",
+                "revealing",
+                "cleavage",
+                "bare",
+                "shirtless",
+                "underwear",
+                "lingerie"
+            ],
+            "regional_severity": "HIGH",
+            "notes": "Conservative dress expected. Women should have modest coverage. Beachwear restricted.",
+            "severity_levels": {
+                "mild": "Slightly revealing Western fashion",
+                "moderate": "Swimwear, shorts above knee",
+                "severe": "Very revealing clothing, underwear visible"
+            }
+        },
+        "lgbtq": {
+            "description": "LGBTQ+ content - strictly prohibited in region",
+            "detection_keywords": [
+                "gay",
+                "lesbian",
+                "lgbtq",
+                "transgender",
+                "pride",
+                "rainbow flag",
+                "same-sex",
+                "queer",
+                "bisexual",
+                "non-binary",
+                "drag",
+                "homosexual"
+            ],
+            "regional_severity": "PROHIBITED",
+            "notes": "LGBTQ+ content is ILLEGAL in most Middle Eastern countries. NO exceptions.",
+            "severity_levels": {
+                "any": "PROHIBITED - Must be removed"
+            },
+            "action_required": "Remove or do not publish"
+        },
+        "profanity": {
+            "description": "Offensive language in any language",
+            "detection_keywords": [
+                "fuck",
+                "shit",
+                "damn",
+                "ass",
+                "bitch",
+                "bastard",
+                "hell",
+                "crap"
+            ],
+            "arabic_keywords": [
+                "كس",
+                "زب",
+                "شرموط",
+                "عرص",
+                "منيوك",
+                "كلب",
+                "حمار",
+                "يلعن"
+            ],
+            "regional_severity": "HIGH",
+            "notes": "Profanity in Arabic is particularly offensive. English profanity also restricted.",
+            "severity_levels": {
+                "mild": "Mild expressions (damn, hell)",
+                "moderate": "Moderate profanity",
+                "severe": "Strong profanity, religious curses"
+            }
+        },
+        "violence": {
+            "description": "Physical harm and violent content",
+            "detection_keywords": [
+                "fight",
+                "punch",
+                "kick",
+                "gun",
+                "knife",
+                "weapon",
+                "blood",
+                "death",
+                "kill",
+                "shoot",
+                "stab",
+                "attack",
+                "war",
+                "bomb",
+                "explosion",
+                "terrorism"
+            ],
+            "regional_severity": "HIGH",
+            "notes": "Violence against Muslims or in Islamic contexts especially sensitive.",
+            "severity_levels": {
+                "mild": "Cartoon/stylized violence",
+                "moderate": "Action violence without gore",
+                "severe": "Realistic violence, blood, terrorism"
+            }
+        }
+    },
+    "platform_specific_rules": [
+        "Alcohol advertising is ILLEGAL - zero tolerance policy",
+        "LGBTQ+ content is ILLEGAL - must be removed",
+        "Content must respect Islamic values and traditions",
+        "No criticism of regional governments or royal families",
+        "Depictions of Prophet Muhammad are strictly forbidden",
+        "Content during Ramadan may have additional restrictions",
+        "Mixed-gender content should maintain Islamic modesty standards",
+        "Israel-related content may be blocked in some countries",
+        "Gaming content with gambling mechanics may be restricted",
+        "Influencer content must comply with local advertising laws",
+        "News content about regional conflicts requires balance",
+        "Religious content requires scholarly review in some cases"
+    ],
+    "country_specific_notes": {
+        "saudi_arabia": "Most conservative. GCAM (General Commission for Audiovisual Media) regulations apply.",
+        "uae": "Relatively moderate. Media Regulatory Office oversees content.",
+        "qatar": "Conservative. Additional restrictions during major events.",
+        "kuwait": "Conservative. Strong religious content oversight.",
+        "bahrain": "Moderate. Some Western content allowed with restrictions.",
+        "oman": "Conservative. Traditional values emphasized."
+    }
+}
