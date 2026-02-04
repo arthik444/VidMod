@@ -20,6 +20,9 @@ class PromptSimplifier:
         "Large scale building explosion in the background" → "building, explosion"
     """
     
+    # Class-level cache - persists across all instances
+    _cache: dict[str, str] = {}
+    
     def __init__(self, api_key: str):
         """Initialize with Gemini API key."""
         genai.configure(api_key=api_key)
@@ -36,6 +39,17 @@ class PromptSimplifier:
         Returns:
             Simplified prompt with concrete objects (e.g., "cigarette")
         """
+        # Normalize key for cache lookup
+        cache_key = complex_prompt.lower().strip()
+        
+        # Check cache first
+        if cache_key in PromptSimplifier._cache:
+            cached_result = PromptSimplifier._cache[cache_key]
+            logger.info(f"CACHE HIT: '{complex_prompt}' → '{cached_result}' (skipped Gemini call)")
+            return cached_result
+        
+        logger.debug(f"CACHE MISS: Simplifying '{complex_prompt}' with Gemini")
+        
         system_instruction = """You are an expert at extracting concrete, visible objects from descriptions.
 
 Your task: Given a description, extract ONLY the physical objects that are visible in a video.
@@ -81,7 +95,10 @@ Now extract the concrete objects:"""
             
             simplified = response.text.strip().strip('"').strip()
             
-            logger.info(f"Prompt simplified: '{complex_prompt}' → '{simplified}'")
+            # Cache the result
+            PromptSimplifier._cache[cache_key] = simplified
+            logger.info(f"Prompt simplified and cached: '{complex_prompt}' → '{simplified}'")
+            
             return simplified
             
         except Exception as e:

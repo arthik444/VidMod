@@ -7,6 +7,7 @@ Policies are passed to Gemini during analysis to ensure factual, consistent comp
 
 import json
 import logging
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional, Any
 
@@ -17,6 +18,9 @@ POLICIES_DIR = Path(__file__).parent / "compliance_policies"
 
 # Cache for loaded policies
 _policy_cache: Dict[str, dict] = {}
+
+# Cache for formatted prompts (computed from policies)
+_formatted_prompt_cache: Dict[str, str] = {}
 
 
 def get_policy_key(platform: str, region: str) -> str:
@@ -103,19 +107,36 @@ def format_policy_for_prompt(platform: str, region: str, rating: str) -> str:
     Format compliance policy as text for insertion into Gemini prompt.
     
     Returns a formatted string with all relevant rules for the given context.
+    Uses caching to avoid recomputing the same prompt multiple times.
     """
+    # Check formatted prompt cache first
+    cache_key = f"{platform.lower()}_{region.lower()}_{rating.lower()}"
+    if cache_key in _formatted_prompt_cache:
+        logger.debug(f"CACHE HIT: Using cached formatted prompt for {cache_key}")
+        return _formatted_prompt_cache[cache_key]
+    
+    logger.debug(f"CACHE MISS: Computing formatted prompt for {cache_key}")
+    
     policy = load_policy(platform, region)
     
     if not policy:
-        # Try global fallback
-        global_policy = POLICIES_DIR / "global.json"
-        if global_policy.exists():
-            try:
-                with open(global_policy, "r", encoding="utf-8") as f:
-                    policy = json.load(f)
-                    logger.info("Using global fallback policy")
-            except Exception:
-                pass
+        # Try global fallback (also cached via load_policy mechanism)
+        policy = load_policy("global", "fallback")
+        if not policy:
+            # Load global.json directly if not in standard format
+            global_key = "global_fallback"
+            if global_key not in _policy_cache:
+                global_policy = POLICIES_DIR / "global.json"
+                if global_policy.exists():
+                    try:
+                        with open(global_policy, "r", encoding="utf-8") as f:
+                            policy = json.load(f)
+                            _policy_cache[global_key] = policy
+                            logger.info("Loaded and cached global fallback policy")
+                    except Exception:
+                        pass
+            else:
+                policy = _policy_cache[global_key]
     
     if not policy:
         return """
@@ -210,7 +231,13 @@ No specific compliance policy found. Use general content moderation guidelines:
             for rule in platform_rules[:5]:
                 lines.append(f"- {rule}")
     
-    return "\n".join(lines)
+    result = "\n".join(lines)
+    
+    # Cache the formatted prompt
+    _formatted_prompt_cache[cache_key] = result
+    logger.info(f"Cached formatted prompt for {cache_key}")
+    
+    return result
 
 
 def list_available_policies() -> list:
