@@ -67,6 +67,10 @@ class JobState:
     
     # S3 storage (optional - for cloud upload)
     s3_url: Optional[str] = None
+    
+    # Audio analysis cache (avoids re-analyzing in censor-audio)
+    profanity_matches: Optional[list] = None  # List of ProfanityMatch objects
+    profanity_analyzed_at: Optional[float] = None  # Timestamp of analysis
 
 
 class VideoPipeline:
@@ -102,10 +106,18 @@ class VideoPipeline:
         self._segmentation = None
         self._video_segmentation = None
         self._inpainting = None
+        self._sam3_video = None  # SAM3 Video Engine
+        self._audio_analyzer = None  # Audio Analyzer (Gemini)
+        self._prompt_simplifier = None  # Prompt Simplifier (Gemini)
+        self._gemini_inpaint = None  # Gemini Inpaint Engine
         
         self.base_storage_dir = base_storage_dir
         self.keyframe_interval = keyframe_interval
         self.replicate_api_token = replicate_api_token
+        
+        # Store Gemini API key for lazy loaders
+        from app.config import get_settings
+        self._gemini_api_key = get_settings().gemini_api_key
         
         # Initialize S3 uploader if AWS credentials provided
         self.s3_uploader = None
@@ -123,8 +135,7 @@ class VideoPipeline:
         
         # Initialize manual analyzer
         from .manual_analyzer import ManualAnalyzer
-        from app.config import get_settings
-        self.manual_analyzer = ManualAnalyzer(api_key=get_settings().gemini_api_key)
+        self.manual_analyzer = ManualAnalyzer(api_key=self._gemini_api_key)
 
         # In-memory job storage (use Redis/DB for production)
         self.jobs: Dict[str, JobState] = {}
@@ -188,14 +199,118 @@ class VideoPipeline:
             self._inpainting = InpaintingEngine(self.replicate_api_token)
         return self._inpainting
     
+    @property
+    def sam3_video(self):
+        """Lazy-load SAM3 Video Engine (singleton)."""
+        if self._sam3_video is None:
+            if not self.replicate_api_token:
+                raise ValueError("Replicate API token required for SAM3 Video segmentation")
+            from .sam3_engine import Sam3VideoEngine
+            self._sam3_video = Sam3VideoEngine(api_token=self.replicate_api_token)
+            logger.info("SAM3 Video Engine initialized (singleton)")
+        return self._sam3_video
+    
+    @property
+    def audio_analyzer(self):
+        """Lazy-load Audio Analyzer (singleton)."""
+        if self._audio_analyzer is None:
+            from .audio_analyzer import AudioAnalyzer
+            self._audio_analyzer = AudioAnalyzer(api_key=self._gemini_api_key)
+            logger.info("Audio Analyzer initialized (singleton)")
+        return self._audio_analyzer
+    
+    @property
+    def prompt_simplifier(self):
+        """Lazy-load Prompt Simplifier (singleton)."""
+        if self._prompt_simplifier is None:
+            from .prompt_simplifier import PromptSimplifier
+            self._prompt_simplifier = PromptSimplifier(api_key=self._gemini_api_key)
+            logger.info("Prompt Simplifier initialized (singleton)")
+        return self._prompt_simplifier
+    
+    @property
+    def gemini_inpaint(self):
+        """Lazy-load Gemini Inpaint Engine (singleton)."""
+        if self._gemini_inpaint is None:
+            from .gemini_inpaint_engine import GeminiInpaintEngine
+            self._gemini_inpaint = GeminiInpaintEngine(api_key=self._gemini_api_key)
+            logger.info("Gemini Inpaint Engine initialized (singleton)")
+        return self._gemini_inpaint
+    
     def _get_job_dir(self, job_id: str) -> Path:
         """Get the directory for a specific job."""
         job_dir = self.base_storage_dir / job_id
         job_dir.mkdir(parents=True, exist_ok=True)
         return job_dir
     
-    def create_job(self, video_path: Path) -> JobState:
-        """Create a new processing job."""
+    def cleanup_job(self, job_id: str) -> bool:
+        """
+        Clean up all files for a specific job.
+        
+        Args:
+            job_id: The job ID to clean up
+            
+        Returns:
+            True if cleanup succeeded, False otherwise
+        """
+        try:
+            job_dir = self.base_storage_dir / job_id
+            if job_dir.exists():
+                shutil.rmtree(job_dir)
+                logger.info(f"Cleaned up job directory: {job_dir}")
+            
+            # Remove from jobs dict
+            if job_id in self.jobs:
+                del self.jobs[job_id]
+                
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to cleanup job {job_id}: {e}")
+            return False
+    
+    def cleanup_all_jobs(self) -> int:
+        """
+        Clean up all existing jobs. Called when a new video is uploaded.
+        
+        Returns:
+            Number of jobs cleaned up
+        """
+        cleaned = 0
+        try:
+            # Get all job directories
+            if self.base_storage_dir.exists():
+                for job_dir in self.base_storage_dir.iterdir():
+                    if job_dir.is_dir():
+                        try:
+                            shutil.rmtree(job_dir)
+                            cleaned += 1
+                            logger.info(f"Cleaned up old job: {job_dir.name}")
+                        except Exception as e:
+                            logger.warning(f"Failed to delete {job_dir}: {e}")
+            
+            # Clear jobs dict
+            old_count = len(self.jobs)
+            self.jobs.clear()
+            
+            logger.info(f"Cleaned up {cleaned} job directories, cleared {old_count} job states")
+            return cleaned
+            
+        except Exception as e:
+            logger.error(f"Cleanup failed: {e}")
+            return cleaned
+    
+    def create_job(self, video_path: Path, cleanup_previous: bool = True) -> JobState:
+        """
+        Create a new processing job.
+        
+        Args:
+            video_path: Path to the video file
+            cleanup_previous: If True, delete all previous jobs before creating new one
+        """
+        # Clean up previous jobs to save disk space
+        if cleanup_previous:
+            self.cleanup_all_jobs()
+        
         job_id = str(uuid.uuid4())[:8]
         job_dir = self._get_job_dir(job_id)
         

@@ -1455,31 +1455,20 @@ async def blur_object(
                 # Step 1: Run SAM3 on the CLIP (much faster!)
                 logger.info(f"Step 1: Creating segmentation for '{request.text_prompt}' on clip using SAM3...")
                 
-                # Simplify prompt for better SAM3 results
-                from core.prompt_simplifier import PromptSimplifier
+                # Simplify prompt for better SAM3 results (uses singleton)
                 try:
-                    simplifier = PromptSimplifier(api_key=pipeline.replicate_api_token)  # Reuse Replicate token for now
-                    # Check if Gemini key is available
-                    from app.config import get_settings
-                    settings = get_settings()
-                    if settings.gemini_api_key:
-                        simplifier = PromptSimplifier(api_key=settings.gemini_api_key)
-                    
-                    simplified_prompt = simplifier.simplify(request.text_prompt)
+                    simplified_prompt = pipeline.prompt_simplifier.simplify(request.text_prompt)
                     logger.info(f"📝 Prompt optimized: '{request.text_prompt}' → '{simplified_prompt}'")
                 except Exception as e:
                     logger.warning(f"Prompt simplification failed, using original: {e}")
                     simplified_prompt = request.text_prompt
                 
-                # Call SAM3 directly on the clip
-                from core.sam3_engine import Sam3VideoEngine
-                sam3_video = Sam3VideoEngine(api_token=pipeline.replicate_api_token)
-                
+                # Call SAM3 directly on the clip (uses singleton)
                 # Use clip's S3 URL if available (fastest), otherwise use local clip path
                 video_source = clip_s3_url if clip_s3_url else clip_path
                 logger.info(f"🎯 SAM3 video source: {'S3 clip URL' if clip_s3_url else 'local clip file'}")
                 
-                result = sam3_video.segment_video(
+                result = pipeline.sam3_video.segment_video(
                     video_source=video_source,  # Use clip's S3 URL or local clip
                     prompt=simplified_prompt,  # Use simplified prompt
                     mask_only=True,  # Pure black/white mask (white = blur areas)
@@ -1932,7 +1921,11 @@ async def analyze_audio(
     Analyze audio for profanity detection only (no censoring).
     Returns detected profanity words with AI-suggested replacements.
     Used by frontend to populate editable word list for voice dubbing.
+    
+    Results are cached in JobState - subsequent calls return cached results.
     """
+    import time
+    
     logger.info(f"Analyzing audio for profanity: {job_id}")
     
     try:
@@ -1944,12 +1937,20 @@ async def analyze_audio(
         if not job.video_path or not job.video_path.exists():
             raise HTTPException(status_code=400, detail="Video file not found")
         
-        # Import audio analyzer
-        from core.audio_analyzer import AudioAnalyzer
-        
-        # Analyze for profanity
-        analyzer = AudioAnalyzer(api_key=settings.gemini_api_key)
-        matches = analyzer.analyze_profanity(job.video_path)
+        # Check if we have cached results
+        if job.profanity_matches is not None:
+            logger.info(f"CACHE HIT: Using cached profanity analysis for job {job_id} (analyzed at {job.profanity_analyzed_at})")
+            matches = job.profanity_matches
+        else:
+            logger.info(f"CACHE MISS: Analyzing audio with Gemini for job {job_id}")
+            
+            # Analyze for profanity (uses singleton)
+            matches = pipeline.audio_analyzer.analyze_profanity(job.video_path)
+            
+            # Cache the results in JobState
+            job.profanity_matches = matches
+            job.profanity_analyzed_at = time.time()
+            logger.info(f"Cached {len(matches)} profanity matches for job {job_id}")
         
         # Return matches for frontend
         return {
@@ -2048,10 +2049,14 @@ async def censor_audio(
     try:
         logger.info(f"Starting audio censoring in '{request.mode}' mode")
         
-        # Step 1: Get profanity matches - use pre-analyzed if provided, otherwise analyze
-        if request.profanity_matches:
+        # Step 1: Get profanity matches - check cache, then request, then analyze
+        if job.profanity_matches is not None:
+            # Use cached matches from JobState (from previous analyze_audio call)
+            logger.info(f"Step 1: CACHE HIT - Using {len(job.profanity_matches)} cached profanity matches from JobState")
+            profanity_matches = job.profanity_matches
+        elif request.profanity_matches:
             # Use pre-analyzed matches from frontend (skips redundant Gemini call!)
-            logger.info(f"Step 1: Using {len(request.profanity_matches)} pre-analyzed profanity matches (skipped re-analysis)")
+            logger.info(f"Step 1: Using {len(request.profanity_matches)} pre-analyzed profanity matches from request")
             from core.audio_analyzer import ProfanityMatch
             profanity_matches = [
                 ProfanityMatch(
@@ -2066,13 +2071,17 @@ async def censor_audio(
                 for m in request.profanity_matches
             ]
         else:
-            # Analyze with Gemini (only if no pre-analyzed matches provided)
-            logger.info("Step 1: Analyzing audio for profanity with Gemini...")
-            analyzer = AudioAnalyzer(api_key=settings.gemini_api_key)
-            profanity_matches = analyzer.analyze_profanity(
+            # Analyze with Gemini (only if no cached or pre-analyzed matches)
+            logger.info("Step 1: CACHE MISS - Analyzing audio for profanity with Gemini...")
+            profanity_matches = pipeline.audio_analyzer.analyze_profanity(
                 video_path=job.video_path,
                 custom_words=request.custom_words
             )
+            # Cache the results for future use
+            import time
+            job.profanity_matches = profanity_matches
+            job.profanity_analyzed_at = time.time()
+            logger.info(f"Cached {len(profanity_matches)} profanity matches in JobState")
         
         if not profanity_matches:
             logger.info("No profanity detected, returning original video")
@@ -2275,9 +2284,8 @@ async def suggest_word_replacements(
     try:
         logger.info(f"Generating word suggestions for {len(request.words_to_replace)} words")
         
-        # First, analyze the video to get word timings
-        analyzer = AudioAnalyzer(api_key=settings.gemini_api_key)
-        matches = analyzer.analyze_profanity(
+        # First, analyze the video to get word timings (uses singleton)
+        matches = pipeline.audio_analyzer.analyze_profanity(
             video_path=job.video_path,
             custom_words=request.words_to_replace
         )
