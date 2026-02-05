@@ -379,7 +379,13 @@ class ElevenLabsDubber:
             audio = self.client.text_to_speech.convert(
                 voice_id=voice_id,
                 text=text,
-                model_id="eleven_multilingual_v2"
+                model_id="eleven_multilingual_v2",
+                voice_settings={
+                    "stability": 0.3,
+                    "similarity_boost": 0.95,
+                    "style": 0.15,
+                    "use_speaker_boost": True
+                }
             )
             
             with open(output_path, 'wb') as f:
@@ -460,7 +466,14 @@ class ElevenLabsDubber:
         
         mute_expr = "|".join(volume_conditions)
         filter_parts = []
-        filter_parts.append(f"[0:a]volume=enable='{mute_expr}':volume=0[muted]")
+        
+        # Frequency-Band Ducking: Suppress 300Hz-3kHz by -36dB and overall volume to 10%
+        # This keeps the background 'rumble' and 'sizzle' (music/effects) while removing speech
+        duck_filter = (
+            f"equalizer=f=1000:width_type=h:w=2700:g=-36:enable='{mute_expr}',"
+            f"volume=enable='{mute_expr}':volume=0.1"
+        )
+        filter_parts.append(f"[0:a]{duck_filter}[muted]")
         
         # Step 2: Process each dubbed segment with refined crossfades (25ms)
         for i, (dub_path, start_time, end_time) in enumerate(dub_segments):
@@ -469,8 +482,16 @@ class ElevenLabsDubber:
             fade_dur = 0.05
             fade_out_st = max(0, duration - fade_dur)
             
-            fade_filter = f"afade=t=in:d={fade_dur},afade=t=out:st={fade_out_st:.6f}:d={fade_dur}"
-            filter_parts.append(f"[{i+1}:a]{fade_filter},adelay={delay_ms}|{delay_ms}[dub{i}]")
+            # Apply highpass (80Hz) to remove digital bass and volume adjustment (1.1x)
+            # This helps the synthetic voice blend better with natural recording environments
+            audio_filters = [
+                f"afade=t=in:d={fade_dur}",
+                f"afade=t=out:st={fade_out_st:.6f}:d={fade_dur}",
+                "highpass=f=80",
+                "volume=1.1"
+            ]
+            filter_chain = ",".join(audio_filters)
+            filter_parts.append(f"[{i+1}:a]{filter_chain},adelay={delay_ms}|{delay_ms}[dub{i}]")
         
         # Step 3: Mix all tracks together
         inputs_to_mix = ["muted"] + [f"dub{i}" for i in range(len(dub_segments))]
@@ -543,7 +564,11 @@ class ElevenLabsDubber:
             audio = self.client.text_to_speech.convert(
                 voice_id=voice_id,
                 text=text,
-                model_id="eleven_multilingual_v2"
+                model_id="eleven_multilingual_v2",
+                voice_settings={
+                    "stability": 0.35,
+                    "similarity_boost": 0.90
+                }
             )
             
             # Save audio - audio is an iterator of bytes
