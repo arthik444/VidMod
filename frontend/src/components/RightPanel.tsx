@@ -9,8 +9,8 @@ function cn(...inputs: ClassValue[]) {
 }
 
 import { type Finding } from './VideoWorkspace';
-import EditPlanPanel from './EditPlanPanel';
 import { type EditVersion } from './AppLayout';
+import EditPlanPanel from './EditPlanPanel';
 
 interface RightPanelProps {
     onSeekTo?: (time: string) => void;
@@ -37,7 +37,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     onToggleVersion,
     selectedVersion
 }) => {
-    const [activePanel, setActivePanel] = useState<'risks' | 'plan' | 'history'>('risks');
+    const [activePanel, setActivePanel] = useState<'risks' | 'plan' | 'history' | 'dubbing'>('risks');
 
     if (isAnalyzing) {
         return (
@@ -133,7 +133,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
             </div>
 
             <AnimatePresence mode="wait">
-                {activePanel === 'risks' ? (
+                {activePanel === 'risks' && (
                     <motion.div
                         key="risks"
                         initial={{ opacity: 0, x: -10 }}
@@ -281,7 +281,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                             </button>
                         </div>
                     </motion.div>
-                ) : activePanel === 'plan' ? (
+                )}
+                {activePanel === 'plan' && (
                     <motion.div
                         key="plan"
                         initial={{ opacity: 0, x: 10 }}
@@ -291,7 +292,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     >
                         <EditPlanPanel findings={findings} jobId={jobId} onActionComplete={onActionComplete} />
                     </motion.div>
-                ) : (
+                )}
+                {activePanel === 'history' && (
                     <motion.div
                         key="history"
                         initial={{ opacity: 0, scale: 0.98 }}

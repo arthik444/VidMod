@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Loader2, Download, EyeOff, RefreshCw, CheckCircle2, AlertTriangle, Sparkles } from 'lucide-react';
+import { X, Loader2, Download, EyeOff, RefreshCw, CheckCircle2, AlertTriangle, Plus, Mic2, Volume2, Wand2, Clock } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -71,6 +71,9 @@ const ActionModal: React.FC<ActionModalProps> = ({
         context?: string;
     }>>([]);
     const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+    const [dubMode, setDubMode] = useState<'auto' | 'clone' | 'beep'>('auto');
+    const [voiceSampleStart, setVoiceSampleStart] = useState<number>(0);
+    const [voiceSampleEnd, setVoiceSampleEnd] = useState<number>(10);
 
     // Track if already loading to prevent duplicate calls (React StrictMode protection)
     const isLoadingRef = useRef(false);
@@ -155,6 +158,18 @@ const ActionModal: React.FC<ActionModalProps> = ({
             console.error('Failed to generate suggestions:', err);
             setLoadingSuggestions(false);
         }
+    };
+
+    // Manually add a new segment
+    const handleAddSegment = () => {
+        const newSegment = {
+            word: 'New Segment',
+            replacement: '',
+            suggestions: [],
+            start_time: timestamp || 0,
+            end_time: (timestamp || 0) + 2,
+        };
+        setProfanityMatches([...profanityMatches, newSegment]);
     };
 
     // Auto-detect objects if box is provided
@@ -245,20 +260,20 @@ const ActionModal: React.FC<ActionModalProps> = ({
                     break;
 
                 case 'censor-dub':
-                    // Censor audio with voice dubbing - pass pre-analyzed matches AND custom replacements
+                    // Censor audio with voice dubbing - pass mode and matches
                     const customReplacements = profanityMatches.reduce((acc, match) => {
-                        acc[match.word] = match.replacement;
+                        if (match.replacement) acc[match.word] = match.replacement;
                         return acc;
                     }, {} as Record<string, string>);
 
                     await censorAudio(
                         jobId,
-                        'dub',
-                        undefined,
-                        undefined,
+                        dubMode,
+                        dubMode === 'clone' ? voiceSampleStart : undefined,
+                        dubMode === 'clone' ? voiceSampleEnd : undefined,
                         undefined,
                         customReplacements,
-                        profanityMatches  // Pass full matches to skip re-analysis!
+                        profanityMatches
                     );
                     finalDownloadUrl = getDownloadUrl(jobId);
                     break;
@@ -308,42 +323,45 @@ const ActionModal: React.FC<ActionModalProps> = ({
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             {/* Backdrop */}
-            <div className="absolute inset-0 bg-background/95 backdrop-blur-sm animate-in fade-in duration-300" onClick={onClose} />
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-500" onClick={onClose} />
 
             {/* Modal */}
-            <div className="relative z-10 w-full max-w-md bg-[#0a0a0c] rounded-2xl border border-white/15 shadow-[0_32px_128px_rgba(0,0,0,0.8),0_0_20px_rgba(255,255,255,0.02)] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between p-5 border-b border-white/10 bg-white/[0.05]">
-                    <h2 className="font-semibold text-lg flex items-center gap-2 text-white">
-                        {actionType.includes('replace') ? <RefreshCw className="w-4 h-4 text-accent" /> : <EyeOff className="w-4 h-4 text-accent" />}
-                        {getTitle()}
-                    </h2>
-                    <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/5 text-muted-foreground hover:text-white transition-colors">
+            <div className="relative z-10 w-full max-w-[440px] max-h-[75vh] flex flex-col bg-[#09090b] rounded-[32px] border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+                <div className="flex items-center justify-between p-6 pb-2">
+                    <div className="space-y-1">
+                        <h2 className="font-bold text-xl tracking-tight flex items-center gap-2.5 text-white">
+                            {actionType.includes('replace') ? <RefreshCw className="w-5 h-5 text-accent/60" /> : <EyeOff className="w-5 h-5 text-accent/60" />}
+                            {getTitle()}
+                        </h2>
+                        <p className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase opacity-50 px-0.5">{getDescription()}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 text-muted-foreground hover:text-white transition-all duration-200">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="p-6 space-y-5">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
 
-                    <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                            <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground flex items-center gap-1.5">
-                                Target Object
+                    <div className="space-y-3">
+                        <div className="flex items-center justify-between px-1">
+                            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
+                                Scene Target
                                 {status === 'detecting' && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
                             </label>
 
                             {/* Suggestions */}
                             {suggestions.length > 0 && (
-                                <div className="flex gap-1.5">
+                                <div className="flex gap-2">
                                     {suggestions.map((s) => (
                                         <button
                                             key={s}
                                             onClick={() => setObjectPrompt(s)}
                                             className={cn(
-                                                "text-[10px] px-2 py-0.5 rounded-md border transition-all duration-200",
+                                                "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border transition-all duration-300",
                                                 objectPrompt === s
-                                                    ? "bg-accent/20 text-accent border-accent/40 shadow-[0_0_15px_rgba(59,130,246,0.3)]"
-                                                    : "bg-white/[0.05] hover:bg-white/[0.1] border-white/10 text-muted-foreground"
+                                                    ? "bg-white text-black border-white"
+                                                    : "bg-white/5 hover:bg-white/10 border-white/5 text-muted-foreground"
                                             )}
                                         >
                                             {s}
@@ -358,18 +376,14 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                 value={objectPrompt}
                                 onChange={(e) => setObjectPrompt(e.target.value)}
                                 className={cn(
-                                    "w-full px-4 py-3 bg-[#111113] rounded-xl border text-sm focus:outline-none transition-all duration-200 placeholder:text-muted-foreground/20",
+                                    "w-full px-5 py-4 bg-white/[0.02] rounded-2xl border text-sm font-medium focus:outline-none transition-all duration-300 placeholder:text-muted-foreground/20",
                                     status === 'detecting'
-                                        ? "border-accent/60 animate-pulse bg-accent/[0.05]"
-                                        : "border-white/10 hover:border-white/20 focus:border-accent/80 focus:ring-1 focus:ring-accent/20"
+                                        ? "border-accent/40 animate-pulse bg-accent/[0.03]"
+                                        : "border-white/5 hover:border-white/10 focus:border-white/20 focus:bg-white/[0.04] focus:ring-4 focus:ring-white/[0.02]"
                                 )}
-                                placeholder={status === 'detecting' ? "Detecting object..." : "Enter object name..."}
+                                placeholder={status === 'detecting' ? "Analyzing frames..." : "Describe the object (e.g., 'the red backpack')"}
                             />
-                            {status === 'detecting' && (
-                                <Sparkles className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-accent animate-pulse" />
-                            )}
                         </div>
-                        <p className="text-[11px] text-muted-foreground/60 leading-relaxed indent-0.5">{getDescription()}</p>
                     </div>
 
                     {/* Mask Only Checkbox */}
@@ -428,7 +442,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                             {actionType === 'replace-runway' && startTime !== undefined && endTime !== undefined && (
                                 <div className="p-4 bg-accent/[0.03] border border-accent/10 rounded-2xl space-y-3">
                                     <div className="flex items-center gap-2">
-                                        <Sparkles className="w-3.5 h-3.5 text-accent" />
+
                                         <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent/80">Smart Clipping Active</span>
                                     </div>
                                     <div className="flex gap-6">
@@ -451,46 +465,178 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
                     {/* Enhanced Word Replacement with Gemini Suggestions (for voice dub mode) */}
                     {actionType === 'censor-dub' && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                                <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground flex items-center gap-2">
-                                    <Sparkles className="w-3.5 h-3.5 text-accent" />
-                                    AI Word Remediation
-                                </label>
-                                <button
-                                    onClick={handleManualGenerate}
-                                    disabled={loadingSuggestions || profanityMatches.length === 0}
-                                    className="flex items-center gap-1.5 px-3 py-1 bg-accent/10 hover:bg-accent/20 disabled:opacity-30 disabled:cursor-not-allowed text-accent rounded-lg text-xs font-semibold transition-all duration-200"
-                                >
-                                    {loadingSuggestions ? (
-                                        <Loader2 className="w-3 h-3 animate-spin" />
-                                    ) : (
-                                        <RefreshCw className="w-3 h-3" />
-                                    )}
-                                    Suggest
-                                </button>
+                        <div className="space-y-3">
+                            <div className="flex flex-col gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-2xl">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
+                                            ElevenLabs Dub Engine
+                                        </label>
+                                        <p className="text-[9px] text-muted-foreground/40 font-medium">Select synthesis strategy</p>
+                                    </div>
+                                    <div className="flex bg-black/40 p-1.5 rounded-xl border border-white/5">
+                                        {(['auto', 'clone', 'beep'] as const).map((m) => (
+                                            <button
+                                                key={m}
+                                                onClick={() => setDubMode(m)}
+                                                className={cn(
+                                                    "px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest transition-all duration-300",
+                                                    dubMode === m
+                                                        ? "bg-white text-black shadow-xl"
+                                                        : "text-muted-foreground/60 hover:text-white"
+                                                )}
+                                            >
+                                                {m}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-1">
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/5 shadow-inner">
+                                            <Mic2 className="w-4.5 h-4.5 text-white/80" />
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <span className="text-[12px] font-bold text-white tracking-wide block leading-none">
+                                                {dubMode === 'auto' ? 'Self-Cloning' : dubMode === 'clone' ? 'Precision Target' : 'Fast Semantic Mask'}
+                                            </span>
+                                            <p className="text-[10px] text-muted-foreground/50 leading-none">
+                                                {dubMode === 'auto' ? 'Multi-speaker cloning' :
+                                                    dubMode === 'clone' ? 'Source-specific fidelity' :
+                                                        'High-speed censorship'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={handleAddSegment}
+                                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white/80 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border border-white/5"
+                                        >
+                                            <Plus className="w-3.5 h-3.5" />
+                                            Manual
+                                        </button>
+                                        <button
+                                            onClick={handleManualGenerate}
+                                            disabled={loadingSuggestions || profanityMatches.length === 0}
+                                            className="flex items-center gap-2 px-4 py-2 bg-white text-black disabled:opacity-30 disabled:cursor-not-allowed rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-300 shadow-xl shadow-white/5"
+                                        >
+                                            {loadingSuggestions ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <Wand2 className="w-3.5 h-3.5" />
+                                            )}
+                                            Suggest
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Voice Cloning Sample Selector */}
+                                {dubMode === 'clone' && (
+                                    <div className="mt-2 p-5 bg-white/[0.03] border border-white/5 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
+                                                    <Volume2 className="w-4 h-4 text-white/40" />
+                                                </div>
+                                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">Clone Source Range</span>
+                                            </div>
+                                            <span className="text-[9px] text-muted-foreground/30 font-mono tracking-tight">5-10s sample</span>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <div className="flex-1 space-y-2">
+                                                <label className="text-[8px] font-bold uppercase text-muted-foreground/40 ml-1 tracking-[0.1em]">Start Time</label>
+                                                <div className="flex items-center gap-3 bg-black/60 rounded-xl px-4 py-3 border border-white/5 group focus-within:border-white/20 transition-all">
+                                                    <Clock className="w-3.5 h-3.5 text-muted-foreground/40 group-focus-within:text-white/60 transition-colors" />
+                                                    <input
+                                                        type="number"
+                                                        value={voiceSampleStart}
+                                                        onChange={(e) => setVoiceSampleStart(parseFloat(e.target.value))}
+                                                        className="bg-transparent border-none text-xs font-bold font-mono w-full focus:ring-0 p-0 text-white/90"
+                                                    />
+                                                    <span className="text-[10px] opacity-20 font-mono">s</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 space-y-2">
+                                                <label className="text-[8px] font-bold uppercase text-muted-foreground/40 ml-1 tracking-[0.1em]">End Time</label>
+                                                <div className="flex items-center gap-3 bg-black/60 rounded-xl px-4 py-3 border border-white/5 group focus-within:border-white/20 transition-all">
+                                                    <Clock className="w-3.5 h-3.5 text-muted-foreground/40 group-focus-within:text-white/60 transition-colors" />
+                                                    <input
+                                                        type="number"
+                                                        value={voiceSampleEnd}
+                                                        onChange={(e) => setVoiceSampleEnd(parseFloat(e.target.value))}
+                                                        className="bg-transparent border-none text-xs font-bold font-mono w-full focus:ring-0 p-0 text-white/90"
+                                                    />
+                                                    <span className="text-[10px] opacity-20 font-mono">s</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
-                            {loadingSuggestions ? (
-                                <div className="p-10 bg-white/[0.05] border border-white/5 rounded-2xl text-center space-y-3">
-                                    <Loader2 className="w-8 h-8 animate-spin mx-auto text-accent/50" />
-                                    <p className="text-[11px] text-muted-foreground/60 italic">Synthesizing alternatives...</p>
+                            {loadingSuggestions && profanityMatches.length === 0 ? (
+                                <div className="p-6 bg-white/[0.02] border border-white/5 rounded-xl text-center space-y-2">
+                                    <Loader2 className="w-5 h-5 animate-spin mx-auto text-white/20" />
+                                    <p className="text-[10px] text-muted-foreground/40 italic">Synthesizing alternatives...</p>
                                 </div>
                             ) : profanityMatches.length === 0 ? (
-                                <div className="p-6 bg-white/[0.05] border border-white/5 rounded-2xl text-center space-y-2">
-                                    <CheckCircle2 className="w-10 h-10 text-emerald-500/20 mx-auto" />
-                                    <p className="text-xs text-muted-foreground">No violations detected in audio stream.</p>
+                                <div className="p-6 bg-white/[0.02] border border-white/5 rounded-xl text-center space-y-2">
+                                    <p className="text-[10px] text-muted-foreground/40 font-medium uppercase tracking-widest">No segments identified</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3 max-h-64 overflow-y-auto pr-1 -mr-1 custom-scrollbar">
+                                <div className="space-y-4">
                                     {profanityMatches.map((match, index) => (
-                                        <div key={index} className="p-4 bg-white/[0.08] border border-white/5 rounded-2xl space-y-3 group hover:border-white/10 transition-all">
+                                        <div key={index} className="p-5 bg-white/[0.02] border border-white/5 rounded-[24px] space-y-5 group hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300">
                                             {/* Word to Replace */}
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="space-y-1.5 flex-1">
-                                                    <span className="text-[9px] font-bold uppercase tracking-[0.05em] text-red-400/60">Detected Segment</span>
-                                                    <div className="px-3 py-2 bg-red-500/5 border border-red-500/10 rounded-xl text-sm font-medium text-red-400/90">
-                                                        {match.word}
+                                            <div className="flex items-start justify-between gap-5">
+                                                <div className="space-y-4 flex-1">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20">Temporal Metadata</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-1.5 bg-black/40 rounded-lg px-2 py-1 border border-white/5">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.1"
+                                                                    value={match.start_time}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...profanityMatches];
+                                                                        updated[index].start_time = parseFloat(e.target.value);
+                                                                        setProfanityMatches(updated);
+                                                                    }}
+                                                                    className="w-12 bg-transparent border-none text-[10px] p-0 font-bold font-mono text-white/60 focus:ring-0"
+                                                                />
+                                                                <span className="text-[8px] font-bold opacity-20 font-mono">s</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-bold opacity-10">/</span>
+                                                            <div className="flex items-center gap-1.5 bg-black/40 rounded-lg px-2 py-1 border border-white/5">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.1"
+                                                                    value={match.end_time}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...profanityMatches];
+                                                                        updated[index].end_time = parseFloat(e.target.value);
+                                                                        setProfanityMatches(updated);
+                                                                    }}
+                                                                    className="w-12 bg-transparent border-none text-[10px] p-0 font-bold font-mono text-white/60 focus:ring-0"
+                                                                />
+                                                                <span className="text-[8px] font-bold opacity-20 font-mono">s</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="relative">
+                                                        <input
+                                                            value={match.word}
+                                                            onChange={(e) => {
+                                                                const updated = [...profanityMatches];
+                                                                updated[index].word = e.target.value;
+                                                                setProfanityMatches(updated);
+                                                            }}
+                                                            className="w-full px-4 py-3 bg-red-500/[0.02] border border-red-500/10 rounded-xl text-sm font-bold text-red-100 placeholder:text-red-900/20 focus:outline-none focus:border-red-500/30 transition-all"
+                                                            placeholder="Segment identifier..."
+                                                        />
                                                     </div>
                                                 </div>
                                                 <button
@@ -498,29 +644,30 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                                         const updated = profanityMatches.filter((_, i) => i !== index);
                                                         setProfanityMatches(updated);
                                                     }}
-                                                    className="mt-5 p-2 bg-white/10 hover:bg-red-500/10 rounded-xl text-muted-foreground/40 hover:text-red-400 transition-all"
-                                                    title="Remove"
+                                                    className="p-2 bg-white/5 hover:bg-red-500/10 rounded-xl text-muted-foreground/20 hover:text-red-400 transition-all duration-300 border border-transparent hover:border-red-500/20"
                                                 >
                                                     <X className="w-4 h-4" />
                                                 </button>
                                             </div>
 
-                                            {/* Replacement Field */}
-                                            <div className="space-y-2">
-                                                <span className="text-[9px] font-bold uppercase tracking-[0.05em] text-accent/60">Proposed Replacement</span>
+                                            {/* Replacement Prompt */}
+                                            <div className="space-y-3 pt-4 border-t border-white/5">
+                                                <div className="flex items-center gap-2 px-1">
+                                                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">Dub Target Context</span>
+                                                </div>
                                                 <input
                                                     type="text"
-                                                    list={`suggestions-${index}`}
                                                     value={match.replacement}
                                                     onChange={(e) => {
                                                         const updated = [...profanityMatches];
                                                         updated[index].replacement = e.target.value;
                                                         setProfanityMatches(updated);
                                                     }}
-                                                    className="w-full px-4 py-3 bg-[#111113] border border-white/10 rounded-xl text-sm focus:outline-none focus:border-accent/60 text-foreground/90 font-medium transition-all"
+                                                    placeholder="Synthesize alternative text..."
+                                                    className="w-full px-5 py-3.5 bg-black/40 border border-white/5 rounded-2xl text-sm font-bold focus:outline-none focus:border-white/20 text-white transition-all duration-300"
                                                 />
                                                 {match.suggestions && match.suggestions.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1.5 mt-2">
+                                                    <div className="flex flex-wrap gap-1.5 mt-3 px-1">
                                                         {match.suggestions.map((suggestion, i) => (
                                                             <button
                                                                 key={i}
@@ -530,10 +677,10 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                                                     setProfanityMatches(updated);
                                                                 }}
                                                                 className={cn(
-                                                                    "px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all duration-200",
+                                                                    "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all duration-300",
                                                                     match.replacement === suggestion
-                                                                        ? "bg-accent/20 text-accent border border-accent/20"
-                                                                        : "bg-white/10 hover:bg-white/20 text-muted-foreground border border-transparent"
+                                                                        ? "bg-white text-black shadow-lg"
+                                                                        : "bg-white/5 hover:bg-white/10 text-muted-foreground/40 hover:text-white border border-white/5"
                                                                 )}
                                                             >
                                                                 {suggestion}
@@ -548,7 +695,6 @@ const ActionModal: React.FC<ActionModalProps> = ({
                             )}
                             <div className="p-3 bg-white/[0.05] border border-white/10 rounded-xl flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                    <Sparkles className="w-3.5 h-3.5 text-accent/40" />
                                     <span className="text-[9px] uppercase font-bold tracking-[0.1em] text-muted-foreground/40">
                                         Intelligent Synthesis Active
                                     </span>
@@ -558,39 +704,35 @@ const ActionModal: React.FC<ActionModalProps> = ({
                     )}
 
                     {/* Status Messages */}
-                    {status === 'error' && (
-                        <div className="flex items-start gap-3 p-4 bg-red-500/[0.03] border border-red-500/10 rounded-2xl text-red-400 text-xs leading-relaxed animate-in slide-in-from-top-2 duration-300">
-                            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                            <div className="space-y-1">
-                                <p className="font-bold uppercase tracking-wider text-[10px]">Processing Failed</p>
-                                <p className="opacity-80">{error}</p>
+                    <div className="px-4 py-2 flex flex-col gap-2">
+                        {status === 'error' && (
+                            <div className="flex items-center gap-2 p-2.5 bg-red-500/[0.03] border border-red-500/10 rounded-xl text-red-400 text-[10px] font-bold animate-in slide-in-from-top-2 duration-300">
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>{error}</span>
                             </div>
-                        </div>
-                    )}
+                        )}
 
-                    {status === 'completed' && (
-                        <div className="flex items-center gap-3 p-4 bg-emerald-500/[0.03] border border-emerald-500/10 rounded-2xl text-emerald-400 text-xs animate-in slide-in-from-top-2 duration-300">
-                            <CheckCircle2 className="w-4 h-4 shrink-0" />
-                            <div className="space-y-0.5">
-                                <p className="font-bold uppercase tracking-wider text-[10px]">Operation Successful</p>
-                                <p className="opacity-80 text-[10px]">Modifications applied and ready for export.</p>
+                        {status === 'completed' && (
+                            <div className="flex items-center gap-2 p-2.5 bg-emerald-500/[0.03] border border-emerald-500/10 rounded-xl text-emerald-400 text-[10px] font-bold animate-in slide-in-from-top-2 duration-300">
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                                <span>Operation Successful</span>
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-3 p-5 border-t border-white/10 bg-white/[0.05]">
+                <div className="flex items-center justify-end gap-4 p-6 pt-2 bg-white/[0.02] border-t border-white/5">
                     {status === 'completed' && downloadUrl && (
-                        <a href={downloadUrl} download className="btn-primary flex items-center gap-2 text-sm shadow-emerald-500/10 bg-emerald-600 hover:bg-emerald-500">
+                        <a href={downloadUrl} download className="btn-primary flex items-center gap-2 bg-emerald-500 text-white border-emerald-400/20 hover:bg-emerald-400 active:scale-95">
                             <Download className="w-4 h-4" />
-                            Download Result
+                            Export Result
                         </a>
                     )}
 
                     <button
                         onClick={onClose}
-                        className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-white hover:bg-white/5 rounded-xl transition-all duration-200"
+                        className="px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 hover:text-white transition-all duration-300"
                     >
                         {status === 'completed' ? 'Close' : 'Cancel'}
                     </button>
@@ -599,12 +741,9 @@ const ActionModal: React.FC<ActionModalProps> = ({
                         <button
                             onClick={handleExecute}
                             disabled={status === 'processing' || status === 'detecting' || (actionType === 'replace-pika' && !referenceImage)}
-                            className={cn(
-                                "btn-primary flex items-center gap-2 text-sm",
-                                (status === 'processing' || status === 'detecting' || (actionType === 'replace-pika' && !referenceImage)) && "opacity-50 cursor-not-allowed scale-100 shadow-none"
-                            )}
+                            className="bg-white text-black px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white/90 active:scale-95 transition-all disabled:opacity-20 flex items-center gap-2"
                         >
-                            {status === 'processing' ? <><Loader2 className="w-4 h-4 animate-spin" />Processing...</> : 'Apply Remediation'}
+                            {status === 'processing' ? <><Loader2 className="w-4 h-4 animate-spin" />Processing</> : 'Apply Modifications'}
                         </button>
                     )}
                 </div>
