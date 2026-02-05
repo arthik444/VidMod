@@ -1,5 +1,5 @@
 """
-Gemini Inpaint Engine - Frame-by-frame image editing using Gemini 2.5 Flash Image.
+Gemini Inpaint Engine - Frame-by-frame image editing using Gemini 3 Pro.
 Uses Nano Banana for object detection and replacement in individual frames.
 Now with SAM mask support and optimized prompts.
 """
@@ -15,7 +15,7 @@ import io
 logger = logging.getLogger(__name__)
 
 # Gemini model for image editing (Nano Banana)
-GEMINI_IMAGE_MODEL = "gemini-2.5-flash-image"
+GEMINI_IMAGE_MODEL = "gemini-3-pro-image-preview"
 
 # Optimized prompts for better object replacement
 MAIN_PROMPT_TEMPLATE = """Replace the masked object with the {replacement} from the reference image.
@@ -36,7 +36,7 @@ floating object, changed background, mismatched lighting"""
 
 class GeminiInpaintEngine:
     """
-    Frame-by-frame image editing using Gemini 2.5 Flash Image (Nano Banana).
+    Frame-by-frame image editing using Gemini 3 Pro (Nano Banana).
     Supports SAM masks, reference images, and optimized prompts.
     """
     

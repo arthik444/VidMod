@@ -1,6 +1,6 @@
 """
 Audio Analyzer Module
-Uses Gemini 2.0 Flash to detect profanity in video/audio with precise timestamps.
+Uses Gemini 3 Flash to detect profanity in video/audio with precise timestamps.
 """
 
 import logging
@@ -27,7 +27,7 @@ class ProfanityMatch:
 
 class AudioAnalyzer:
     """
-    Analyzes video/audio for profanity using Gemini 2.0 Flash.
+    Analyzes video/audio for profanity using Gemini 3 Flash.
     
     Example:
         analyzer = AudioAnalyzer(api_key="your_key")
@@ -44,8 +44,8 @@ class AudioAnalyzer:
             api_key: Gemini API key
         """
         genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel('gemini-2.0-flash')
-        logger.info("AudioAnalyzer initialized with Gemini 2.0 Flash")
+        self.model = genai.GenerativeModel('gemini-3-flash-preview')
+        logger.info("AudioAnalyzer initialized with Gemini 3 Flash")
     
     def analyze_profanity(
         self,

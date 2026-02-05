@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, ShieldAlert, History, Beer, ShieldX, Sword, MessageCircle, AlertTriangle, Download, Eye, ChevronRight } from 'lucide-react';
+import { CheckCircle2, ShieldAlert, History, Beer, ShieldX, Sword, MessageCircle, AlertTriangle, Download, Eye, ChevronRight, Mic2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -9,8 +9,9 @@ function cn(...inputs: ClassValue[]) {
 }
 
 import { type Finding } from './VideoWorkspace';
-import EditPlanPanel from './EditPlanPanel';
 import { type EditVersion } from './AppLayout';
+import DubbingPanel from './DubbingPanel';
+import EditPlanPanel from './EditPlanPanel';
 
 interface RightPanelProps {
     onSeekTo?: (time: string) => void;
@@ -37,7 +38,7 @@ const RightPanel: React.FC<RightPanelProps> = ({
     onToggleVersion,
     selectedVersion
 }) => {
-    const [activePanel, setActivePanel] = useState<'risks' | 'plan' | 'history'>('risks');
+    const [activePanel, setActivePanel] = useState<'risks' | 'plan' | 'history' | 'dubbing'>('risks');
 
     if (isAnalyzing) {
         return (
@@ -90,8 +91,9 @@ const RightPanel: React.FC<RightPanelProps> = ({
         return `${format(start)} - ${format(end)}`;
     };
 
-    const tabs: { id: 'risks' | 'plan' | 'history', label: string, icon: any, count?: number }[] = [
+    const tabs: { id: 'risks' | 'plan' | 'history' | 'dubbing', label: string, icon: any, count?: number }[] = [
         { id: 'risks', label: 'Analysis', icon: ShieldAlert },
+        { id: 'dubbing', label: 'Dubbing', icon: Mic2 },
         { id: 'plan', label: 'Remediation', icon: CheckCircle2 },
         { id: 'history', label: 'History', icon: History, count: editHistory.length },
     ];
@@ -133,7 +135,25 @@ const RightPanel: React.FC<RightPanelProps> = ({
             </div>
 
             <AnimatePresence mode="wait">
-                {activePanel === 'risks' ? (
+                {activePanel === 'dubbing' && (
+                    <motion.div
+                        key="dubbing"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 10 }}
+                        className="flex-1 flex flex-col overflow-hidden"
+                    >
+                        {jobId ? (
+                            <DubbingPanel jobId={jobId} onActionComplete={onActionComplete} />
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-4">
+                                <Mic2 className="w-12 h-12 text-muted-foreground/20" />
+                                <p className="text-sm text-muted-foreground">Upload a video to start dubbing.</p>
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+                {activePanel === 'risks' && (
                     <motion.div
                         key="risks"
                         initial={{ opacity: 0, x: -10 }}
@@ -281,7 +301,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                             </button>
                         </div>
                     </motion.div>
-                ) : activePanel === 'plan' ? (
+                )}
+                {activePanel === 'plan' && (
                     <motion.div
                         key="plan"
                         initial={{ opacity: 0, x: 10 }}
@@ -291,7 +312,8 @@ const RightPanel: React.FC<RightPanelProps> = ({
                     >
                         <EditPlanPanel findings={findings} jobId={jobId} onActionComplete={onActionComplete} />
                     </motion.div>
-                ) : (
+                )}
+                {activePanel === 'history' && (
                     <motion.div
                         key="history"
                         initial={{ opacity: 0, scale: 0.98 }}

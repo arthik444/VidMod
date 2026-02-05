@@ -1,5 +1,5 @@
 """
-Gemini Video Analyzer - Analyze videos for compliance violations using Gemini 2.5 Pro.
+Gemini Video Analyzer - Analyze videos for compliance violations using Gemini 3 Pro.
 Uses native video understanding to detect objects, actions, and violations.
 """
 
@@ -12,7 +12,7 @@ from typing import Optional, List, Dict, Any
 logger = logging.getLogger(__name__)
 
 # Gemini model for video analysis (native video support)
-GEMINI_VIDEO_MODEL = "gemini-3-flash-preview"
+GEMINI_VIDEO_MODEL = "gemini-3-pro-preview"
 
 
 # JSON Schema for structured output matching frontend Finding type
@@ -99,7 +99,7 @@ No specific policy loaded. Use general content moderation guidelines:
 
 class GeminiVideoAnalyzer:
     """
-    Analyze videos for compliance violations using Gemini 2.5 Pro.
+    Analyze videos for compliance violations using Gemini 3 Pro.
     Uses native video understanding - no frame extraction needed.
     """
     
@@ -289,7 +289,7 @@ def analyzeVideoWithGemini(
     rating: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Analyze a video for compliance violations using Gemini 2.5 Pro.
+    Analyze a video for compliance violations using Gemini 3 Pro.
     
     This is the main entry point function for video analysis. When platform,
     region, and rating are provided, uses grounded compliance policies for
