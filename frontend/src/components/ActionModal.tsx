@@ -326,11 +326,11 @@ const ActionModal: React.FC<ActionModalProps> = ({
             <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-500" onClick={onClose} />
 
             {/* Modal */}
-            <div className="relative z-10 w-full max-w-[400px] max-h-[65vh] flex flex-col bg-[#09090b] rounded-[20px] border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.01]">
+            <div className="relative z-10 w-full max-w-[440px] max-h-[75vh] flex flex-col bg-[#09090b] rounded-[32px] border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+                <div className="flex items-center justify-between p-6 pb-2">
                     <div className="space-y-1">
-                        <h2 className="font-bold text-base tracking-tight flex items-center gap-2 text-white">
-                            {actionType.includes('replace') ? <RefreshCw className="w-3.5 h-3.5 text-accent/60" /> : <EyeOff className="w-3.5 h-3.5 text-accent/60" />}
+                        <h2 className="font-bold text-xl tracking-tight flex items-center gap-2.5 text-white">
+                            {actionType.includes('replace') ? <RefreshCw className="w-5 h-5 text-accent/60" /> : <EyeOff className="w-5 h-5 text-accent/60" />}
                             {getTitle()}
                         </h2>
                         <p className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase opacity-50 px-0.5">{getDescription()}</p>
@@ -341,7 +341,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-3.5 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
 
                     <div className="space-y-3">
                         <div className="flex items-center justify-between px-1">
@@ -376,7 +376,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                 value={objectPrompt}
                                 onChange={(e) => setObjectPrompt(e.target.value)}
                                 className={cn(
-                                    "w-full px-3.5 py-2.5 bg-white/[0.02] rounded-lg border text-sm font-medium focus:outline-none transition-all duration-300 placeholder:text-muted-foreground/20",
+                                    "w-full px-5 py-4 bg-white/[0.02] rounded-2xl border text-sm font-medium focus:outline-none transition-all duration-300 placeholder:text-muted-foreground/20",
                                     status === 'detecting'
                                         ? "border-accent/40 animate-pulse bg-accent/[0.03]"
                                         : "border-white/5 hover:border-white/10 focus:border-white/20 focus:bg-white/[0.04] focus:ring-4 focus:ring-white/[0.02]"
@@ -494,14 +494,14 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
                                 <div className="flex items-center justify-between pt-1">
                                     <div className="flex items-center gap-4">
-                                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-white/5 border border-white/5 shadow-inner">
-                                            <Mic2 className="w-4 h-4 text-white/80" />
+                                        <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/5 shadow-inner">
+                                            <Mic2 className="w-4.5 h-4.5 text-white/80" />
                                         </div>
                                         <div className="space-y-0.5">
-                                            <span className="text-[11px] font-bold text-white tracking-wide block">
+                                            <span className="text-[12px] font-bold text-white tracking-wide block leading-none">
                                                 {dubMode === 'auto' ? 'Self-Cloning' : dubMode === 'clone' ? 'Precision Target' : 'Fast Semantic Mask'}
                                             </span>
-                                            <p className="text-[10px] text-muted-foreground/60 leading-none">
+                                            <p className="text-[10px] text-muted-foreground/50 leading-none">
                                                 {dubMode === 'auto' ? 'Multi-speaker cloning' :
                                                     dubMode === 'clone' ? 'Source-specific fidelity' :
                                                         'High-speed censorship'}
@@ -511,15 +511,15 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                     <div className="flex items-center gap-2">
                                         <button
                                             onClick={handleAddSegment}
-                                            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white/80 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border border-white/5"
+                                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white/80 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border border-white/5"
                                         >
                                             <Plus className="w-3.5 h-3.5" />
-                                            Add
+                                            Manual
                                         </button>
                                         <button
                                             onClick={handleManualGenerate}
                                             disabled={loadingSuggestions || profanityMatches.length === 0}
-                                            className="flex items-center gap-2 px-2.5 py-1 bg-white text-black disabled:opacity-30 disabled:cursor-not-allowed rounded-md text-[9px] font-bold uppercase tracking-wider transition-all duration-300"
+                                            className="flex items-center gap-2 px-4 py-2 bg-white text-black disabled:opacity-30 disabled:cursor-not-allowed rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-300 shadow-xl shadow-white/5"
                                         >
                                             {loadingSuggestions ? (
                                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -533,37 +533,41 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
                                 {/* Voice Cloning Sample Selector */}
                                 {dubMode === 'clone' && (
-                                    <div className="mt-1 p-3 bg-white/[0.03] border border-white/5 rounded-xl space-y-2 animate-in fade-in slide-in-from-top-4 duration-500">
-                                        <div className="flex items-center justify-between px-1">
-                                            <div className="flex items-center gap-2">
-                                                <Volume2 className="w-3.5 h-3.5 text-white/40" />
-                                                <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-white/60">Source Sampling</span>
+                                    <div className="mt-2 p-5 bg-white/[0.03] border border-white/5 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
+                                                    <Volume2 className="w-4 h-4 text-white/40" />
+                                                </div>
+                                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">Clone Source Range</span>
                                             </div>
-                                            <span className="text-[8px] text-muted-foreground/30 font-mono italic">5-10s window</span>
+                                            <span className="text-[9px] text-muted-foreground/30 font-mono tracking-tight">5-10s sample</span>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <div className="flex-1 space-y-1">
-                                                <div className="flex items-center gap-2 bg-black/40 rounded-lg px-2 py-1.5 border border-white/5">
-                                                    <Clock className="w-3 h-3 text-muted-foreground/20" />
+                                        <div className="flex gap-4">
+                                            <div className="flex-1 space-y-2">
+                                                <label className="text-[8px] font-bold uppercase text-muted-foreground/40 ml-1 tracking-[0.1em]">Start Time</label>
+                                                <div className="flex items-center gap-3 bg-black/60 rounded-xl px-4 py-3 border border-white/5 group focus-within:border-white/20 transition-all">
+                                                    <Clock className="w-3.5 h-3.5 text-muted-foreground/40 group-focus-within:text-white/60 transition-colors" />
                                                     <input
                                                         type="number"
                                                         value={voiceSampleStart}
                                                         onChange={(e) => setVoiceSampleStart(parseFloat(e.target.value))}
-                                                        className="bg-transparent border-none text-[10px] font-bold font-mono w-full focus:ring-0 p-0 text-white/80"
+                                                        className="bg-transparent border-none text-xs font-bold font-mono w-full focus:ring-0 p-0 text-white/90"
                                                     />
-                                                    <span className="text-[9px] opacity-10 font-mono">s</span>
+                                                    <span className="text-[10px] opacity-20 font-mono">s</span>
                                                 </div>
                                             </div>
-                                            <div className="flex-1 space-y-1">
-                                                <div className="flex items-center gap-2 bg-black/40 rounded-lg px-2 py-1.5 border border-white/5">
-                                                    <Clock className="w-3 h-3 text-muted-foreground/20" />
+                                            <div className="flex-1 space-y-2">
+                                                <label className="text-[8px] font-bold uppercase text-muted-foreground/40 ml-1 tracking-[0.1em]">End Time</label>
+                                                <div className="flex items-center gap-3 bg-black/60 rounded-xl px-4 py-3 border border-white/5 group focus-within:border-white/20 transition-all">
+                                                    <Clock className="w-3.5 h-3.5 text-muted-foreground/40 group-focus-within:text-white/60 transition-colors" />
                                                     <input
                                                         type="number"
                                                         value={voiceSampleEnd}
                                                         onChange={(e) => setVoiceSampleEnd(parseFloat(e.target.value))}
-                                                        className="bg-transparent border-none text-[10px] font-bold font-mono w-full focus:ring-0 p-0 text-white/80"
+                                                        className="bg-transparent border-none text-xs font-bold font-mono w-full focus:ring-0 p-0 text-white/90"
                                                     />
-                                                    <span className="text-[9px] opacity-10 font-mono">s</span>
+                                                    <span className="text-[10px] opacity-20 font-mono">s</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -581,65 +585,76 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                     <p className="text-[10px] text-muted-foreground/40 font-medium uppercase tracking-widest">No segments identified</p>
                                 </div>
                             ) : (
-                                <div className="space-y-3">
+                                <div className="space-y-4">
                                     {profanityMatches.map((match, index) => (
-                                        <div key={index} className="p-3 bg-white/[0.01] border border-white/5 rounded-2xl space-y-3 group hover:border-white/10 transition-all duration-300">
+                                        <div key={index} className="p-5 bg-white/[0.02] border border-white/5 rounded-[24px] space-y-5 group hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300">
                                             {/* Word to Replace */}
-                                            <div className="flex items-center justify-between gap-4">
-                                                <div className="flex items-center gap-2 flex-1">
-                                                    <div className="flex items-center gap-1.5 bg-black/40 rounded-md px-2 py-1 border border-white/5">
+                                            <div className="flex items-start justify-between gap-5">
+                                                <div className="space-y-4 flex-1">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20">Temporal Metadata</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="flex items-center gap-1.5 bg-black/40 rounded-lg px-2 py-1 border border-white/5">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.1"
+                                                                    value={match.start_time}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...profanityMatches];
+                                                                        updated[index].start_time = parseFloat(e.target.value);
+                                                                        setProfanityMatches(updated);
+                                                                    }}
+                                                                    className="w-12 bg-transparent border-none text-[10px] p-0 font-bold font-mono text-white/60 focus:ring-0"
+                                                                />
+                                                                <span className="text-[8px] font-bold opacity-20 font-mono">s</span>
+                                                            </div>
+                                                            <span className="text-[10px] font-bold opacity-10">/</span>
+                                                            <div className="flex items-center gap-1.5 bg-black/40 rounded-lg px-2 py-1 border border-white/5">
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.1"
+                                                                    value={match.end_time}
+                                                                    onChange={(e) => {
+                                                                        const updated = [...profanityMatches];
+                                                                        updated[index].end_time = parseFloat(e.target.value);
+                                                                        setProfanityMatches(updated);
+                                                                    }}
+                                                                    className="w-12 bg-transparent border-none text-[10px] p-0 font-bold font-mono text-white/60 focus:ring-0"
+                                                                />
+                                                                <span className="text-[8px] font-bold opacity-20 font-mono">s</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="relative">
                                                         <input
-                                                            type="number"
-                                                            step="0.1"
-                                                            value={match.start_time}
+                                                            value={match.word}
                                                             onChange={(e) => {
                                                                 const updated = [...profanityMatches];
-                                                                updated[index].start_time = parseFloat(e.target.value);
+                                                                updated[index].word = e.target.value;
                                                                 setProfanityMatches(updated);
                                                             }}
-                                                            className="w-10 bg-transparent border-none text-[10px] p-0 font-bold font-mono text-white/40 focus:ring-0"
+                                                            className="w-full px-4 py-3 bg-red-500/[0.02] border border-red-500/10 rounded-xl text-sm font-bold text-red-100 placeholder:text-red-900/20 focus:outline-none focus:border-red-500/30 transition-all"
+                                                            placeholder="Segment identifier..."
                                                         />
-                                                        <span className="text-[8px] font-bold opacity-10 font-mono">s</span>
                                                     </div>
-                                                    <span className="text-[9px] font-bold opacity-10">-</span>
-                                                    <div className="flex items-center gap-1.5 bg-black/40 rounded-md px-2 py-1 border border-white/5">
-                                                        <input
-                                                            type="number"
-                                                            step="0.1"
-                                                            value={match.end_time}
-                                                            onChange={(e) => {
-                                                                const updated = [...profanityMatches];
-                                                                updated[index].end_time = parseFloat(e.target.value);
-                                                                setProfanityMatches(updated);
-                                                            }}
-                                                            className="w-10 bg-transparent border-none text-[10px] p-0 font-bold font-mono text-white/40 focus:ring-0"
-                                                        />
-                                                        <span className="text-[8px] font-bold opacity-10 font-mono">s</span>
-                                                    </div>
-                                                    <input
-                                                        value={match.word}
-                                                        onChange={(e) => {
-                                                            const updated = [...profanityMatches];
-                                                            updated[index].word = e.target.value;
-                                                            setProfanityMatches(updated);
-                                                        }}
-                                                        className="flex-1 bg-transparent border-none text-xs font-bold text-red-200/60 placeholder:text-white/5 focus:outline-none focus:ring-0 p-0"
-                                                        placeholder="Term..."
-                                                    />
                                                 </div>
                                                 <button
                                                     onClick={() => {
                                                         const updated = profanityMatches.filter((_, i) => i !== index);
                                                         setProfanityMatches(updated);
                                                     }}
-                                                    className="p-1.5 text-muted-foreground/20 hover:text-red-400 transition-all"
+                                                    className="p-2 bg-white/5 hover:bg-red-500/10 rounded-xl text-muted-foreground/20 hover:text-red-400 transition-all duration-300 border border-transparent hover:border-red-500/20"
                                                 >
-                                                    <X className="w-3.5 h-3.5" />
+                                                    <X className="w-4 h-4" />
                                                 </button>
                                             </div>
 
                                             {/* Replacement Prompt */}
-                                            <div className="space-y-2 pt-2 border-t border-white/5">
+                                            <div className="space-y-3 pt-4 border-t border-white/5">
+                                                <div className="flex items-center gap-2 px-1">
+                                                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">Dub Target Context</span>
+                                                </div>
                                                 <input
                                                     type="text"
                                                     value={match.replacement}
@@ -648,11 +663,11 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                                         updated[index].replacement = e.target.value;
                                                         setProfanityMatches(updated);
                                                     }}
-                                                    placeholder="Synthetic target..."
-                                                    className="w-full px-3 py-2 bg-black/20 border border-white/5 rounded-lg text-xs font-medium focus:outline-none focus:border-white/20 text-white/80 transition-all"
+                                                    placeholder="Synthesize alternative text..."
+                                                    className="w-full px-5 py-3.5 bg-black/40 border border-white/5 rounded-2xl text-sm font-bold focus:outline-none focus:border-white/20 text-white transition-all duration-300"
                                                 />
                                                 {match.suggestions && match.suggestions.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1">
+                                                    <div className="flex flex-wrap gap-1.5 mt-3 px-1">
                                                         {match.suggestions.map((suggestion, i) => (
                                                             <button
                                                                 key={i}
@@ -662,10 +677,10 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                                                     setProfanityMatches(updated);
                                                                 }}
                                                                 className={cn(
-                                                                    "px-2 py-1 rounded-md text-[8px] font-bold uppercase tracking-widest transition-all",
+                                                                    "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all duration-300",
                                                                     match.replacement === suggestion
-                                                                        ? "bg-white text-black"
-                                                                        : "bg-white/5 hover:bg-white/10 text-white/20 hover:text-white"
+                                                                        ? "bg-white text-black shadow-lg"
+                                                                        : "bg-white/5 hover:bg-white/10 text-muted-foreground/40 hover:text-white border border-white/5"
                                                                 )}
                                                             >
                                                                 {suggestion}
@@ -707,7 +722,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-2 p-4 bg-white/[0.01] border-t border-white/5">
+                <div className="flex items-center justify-end gap-4 p-6 pt-2 bg-white/[0.02] border-t border-white/5">
                     {status === 'completed' && downloadUrl && (
                         <a href={downloadUrl} download className="btn-primary flex items-center gap-2 bg-emerald-500 text-white border-emerald-400/20 hover:bg-emerald-400 active:scale-95">
                             <Download className="w-4 h-4" />
@@ -717,18 +732,20 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
                     <button
                         onClick={onClose}
-                        className="px-3.5 py-2 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 hover:text-white transition-all duration-300"
+                        className="px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 hover:text-white transition-all duration-300"
                     >
                         {status === 'completed' ? 'Close' : 'Cancel'}
                     </button>
 
-                    <button
-                        onClick={handleExecute}
-                        disabled={status === 'processing' || status === 'detecting' || (actionType === 'replace-pika' && !referenceImage)}
-                        className="px-5 py-2 bg-white text-black rounded-lg text-[10px] font-bold uppercase tracking-widest hover:bg-white/90 transition-all disabled:opacity-20"
-                    >
-                        {status === 'processing' ? <><Loader2 className="w-3 h-3 animate-spin mr-2" />Wait</> : 'Apply'}
-                    </button>
+                    {status !== 'completed' && (
+                        <button
+                            onClick={handleExecute}
+                            disabled={status === 'processing' || status === 'detecting' || (actionType === 'replace-pika' && !referenceImage)}
+                            className="bg-white text-black px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white/90 active:scale-95 transition-all disabled:opacity-20 flex items-center gap-2"
+                        >
+                            {status === 'processing' ? <><Loader2 className="w-4 h-4 animate-spin" />Processing</> : 'Apply Modifications'}
+                        </button>
+                    )}
                 </div>
             </div>
         </div>
