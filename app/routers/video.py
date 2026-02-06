@@ -77,10 +77,8 @@ def get_pipeline(settings: Settings = Depends(get_settings)) -> VideoPipeline:
             keyframe_interval=settings.keyframe_interval,
             ffmpeg_path=settings.get_ffmpeg_path(),
             ffprobe_path=settings.get_ffprobe_path(),
-            aws_bucket_name=settings.aws_s3_bucket_name if settings.aws_s3_bucket_name else None,
-            aws_region=settings.aws_region,
-            aws_access_key_id=settings.aws_access_key_id if settings.aws_access_key_id else None,
-            aws_secret_access_key=settings.aws_secret_access_key if settings.aws_secret_access_key else None
+            gcs_bucket_name=settings.gcs_bucket_name if settings.gcs_bucket_name else None,
+            gcs_project_id=settings.gcs_project_id
         )
     return _pipeline
 
@@ -246,19 +244,19 @@ async def download_video(
 @router.get("/videos", response_model=List[VideoMetadata])
 async def list_videos(pipeline: VideoPipeline = Depends(get_pipeline)):
     """
-    List all videos available in S3 bucket.
-    Returns empty list if S3 is not configured.
+    List all videos available in GCS bucket.
+    Returns empty list if GCS is not configured.
     """
-    if not pipeline.s3_uploader:
-        logger.warning("S3 not configured, returning empty video list")
+    if not pipeline.gcs_uploader:
+        logger.warning("GCS not configured, returning empty video list")
         return []
     
     try:
-        videos = pipeline.s3_uploader.list_videos(prefix="jobs/")
-        logger.info(f"Found {len(videos)} videos in S3")
+        videos = pipeline.gcs_uploader.list_videos(prefix="jobs/")
+        logger.info(f"Found {len(videos)} videos in GCS")
         return videos
     except Exception as e:
-        logger.error(f"Failed to list S3 videos: {e}")
+        logger.error(f"Failed to list GCS videos: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to list videos: {str(e)}")
 
 
@@ -268,11 +266,11 @@ async def use_existing_video(
     pipeline: VideoPipeline = Depends(get_pipeline)
 ):
     """
-    Create a job from an existing S3 video without re-uploading.
+    Create a job from an existing GCS video without re-uploading.
     This allows users to reuse videos they've already uploaded.
     """
-    if not pipeline.s3_uploader:
-        raise HTTPException(status_code=501, detail="S3 not configured")
+    if not pipeline.gcs_uploader:
+        raise HTTPException(status_code=501, detail="GCS not configured")
     
     try:
         from core.pipeline import JobState
@@ -280,17 +278,18 @@ async def use_existing_video(
         import httpx
         from pathlib import Path
         
-        # Extract job_id from S3 URL (e.g., jobs/abc123/input.mp4 -> abc123)
-        s3_key_parts = request.s3_url.split('/')
+        # Extract job_id from GCS URL (e.g., .../jobs/abc123/input.mp4 -> abc123)
+        # URL format: https://storage.googleapis.com/bucket-name/jobs/abc123/input.mp4
+        url_parts = request.s3_url.split('/')
         existing_job_id = None
-        if 'jobs' in s3_key_parts:
-            idx = s3_key_parts.index('jobs')
-            if idx + 1 < len(s3_key_parts):
-                existing_job_id = s3_key_parts[idx + 1]
+        if 'jobs' in url_parts:
+            idx = url_parts.index('jobs')
+            if idx + 1 < len(url_parts):
+                existing_job_id = url_parts[idx + 1]
         
         # Check if we already have this video locally (from previous upload)
         if existing_job_id:
-            existing_job_dir = Path(pipeline.storage_path) / "jobs" / existing_job_id
+            existing_job_dir = Path(pipeline.base_storage_dir) / existing_job_id
             existing_video_path = existing_job_dir / "input.mp4"
             
             if existing_video_path.exists():
@@ -305,7 +304,7 @@ async def use_existing_video(
                     job = JobState(
                         job_id=existing_job_id,
                         video_path=existing_video_path,
-                        s3_url=request.s3_url,
+                        gcs_url=request.s3_url,
                         frames_dir=None,
                         masks_dir=None,
                         inpainted_dir=None,
@@ -319,19 +318,21 @@ async def use_existing_video(
                     job_id=job.job_id,
                     message=f"Using existing video from library: {filename}",
                     preview_frame_url="",
-                    video_info={"source": "s3_library_local", "url": request.s3_url}
+                    video_info={"source": "gcs_library_local", "url": request.s3_url}
                 )
         
-        # If not found locally, download from S3 (new job)
-        logger.info(f"📥 Video not found locally, downloading from S3...")
+        # If not found locally, download from GCS (new job)
+        logger.info(f"📥 Video not found locally, downloading from GCS...")
         job_id = str(uuid.uuid4())[:8]
-        job_dir = Path(pipeline.storage_path) / "jobs" / job_id
+        job_dir = Path(pipeline.base_storage_dir) / job_id
         job_dir.mkdir(parents=True, exist_ok=True)
         
         filename = request.filename or request.s3_url.split("/")[-1]
         local_video_path = job_dir / "input.mp4"
         
-        logger.info(f"Downloading S3 video to local storage: {request.s3_url}")
+        logger.info(f"Downloading GCS video to local storage: {request.s3_url}")
+        # Use GCS uploader or httpx
+        # If public, httpx is fine
         response = httpx.get(request.s3_url, follow_redirects=True)
         response.raise_for_status()
         with open(local_video_path, 'wb') as f:
@@ -342,7 +343,7 @@ async def use_existing_video(
         job = JobState(
             job_id=job_id,
             video_path=local_video_path,
-            s3_url=request.s3_url,
+            gcs_url=request.s3_url,
             frames_dir=None,
             masks_dir=None,
             inpainted_dir=None,
@@ -351,17 +352,17 @@ async def use_existing_video(
         
         pipeline.jobs[job.job_id] = job
         
-        logger.info(f"Created new job {job.job_id} from S3 video: {request.s3_url}")
+        logger.info(f"Created new job {job.job_id} from GCS video: {request.s3_url}")
         
         return VideoUploadResponse(
             job_id=job.job_id,
             message=f"Downloaded from library: {filename}",
             preview_frame_url="",
-            video_info={"source": "s3_library_download", "url": request.s3_url}
+            video_info={"source": "gcs_library_download", "url": request.s3_url}
         )
         
     except Exception as e:
-        logger.error(f"Failed to create job from S3 video: {e}")
+        logger.error(f"Failed to create job from GCS video: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -1337,16 +1338,16 @@ async def blur_object(
                 buffer_seconds=1.0
             )
             
-            # Upload clip to S3 for faster SAM3 processing
-            clip_s3_url = None
-            if pipeline.s3_uploader and job.s3_url:
+            # Upload clip to GCS for faster SAM3 processing
+            clip_gcs_url = None
+            if pipeline.gcs_uploader and job.gcs_url:
                 try:
-                    logger.info(f"📤 Uploading clip to S3 for faster processing...")
-                    clip_s3_key = f"jobs/{request.job_id}/clip_{request.start_time}_{request.end_time}.mp4"
-                    clip_s3_url = pipeline.s3_uploader.upload_video(clip_path, clip_s3_key)
-                    logger.info(f"✅ Clip uploaded to S3: {clip_s3_url}")
+                    logger.info(f"📤 Uploading clip to GCS for faster processing...")
+                    clip_gcs_key = f"jobs/{request.job_id}/clip_{request.start_time}_{request.end_time}.mp4"
+                    clip_gcs_url = pipeline.gcs_uploader.upload_video(clip_path, clip_gcs_key)
+                    logger.info(f"✅ Clip uploaded to GCS: {clip_gcs_url}")
                 except Exception as e:
-                    logger.warning(f"Failed to upload clip to S3, will use local file: {e}")
+                    logger.warning(f"Failed to upload clip to GCS, will use local file: {e}")
             
             # Create a cache key from the prompt (sanitized for filename)
             prompt_hash = hashlib.md5(request.text_prompt.lower().encode()).hexdigest()[:8]
@@ -1371,12 +1372,12 @@ async def blur_object(
                     simplified_prompt = request.text_prompt
                 
                 # Call SAM3 directly on the clip (uses singleton)
-                # Use clip's S3 URL if available (fastest), otherwise use local clip path
-                video_source = clip_s3_url if clip_s3_url else clip_path
-                logger.info(f"🎯 SAM3 video source: {'S3 clip URL' if clip_s3_url else 'local clip file'}")
+                # Use clip's GCS URL if available (fastest), otherwise use local clip path
+                video_source = clip_gcs_url if clip_gcs_url else clip_path
+                logger.info(f"🎯 SAM3 video source: {'GCS clip URL' if clip_gcs_url else 'local clip file'}")
                 
                 result = pipeline.sam3_video.segment_video(
-                    video_source=video_source,  # Use clip's S3 URL or local clip
+                    video_source=video_source,  # Use clip's GCS URL or local clip
                     prompt=simplified_prompt,  # Use simplified prompt
                     mask_only=True,  # Pure black/white mask (white = blur areas)
                 )
@@ -1564,6 +1565,7 @@ async def analyze_manual(
         )
         
     except ValueError as e:
+        logger.error(f"Manual analysis ValueError: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Manual analysis failed: {e}")
@@ -1815,10 +1817,11 @@ async def replace_with_runway(
     try:
         # Use Runway's direct API key from settings
         runway_key = settings.runway_api_key
-        if not runway_key:
-            raise HTTPException(status_code=500, detail="RUNWAY_API_KEY not configured in .env")
-        
-        engine = RunwayEngine(api_key=runway_key, s3_uploader=pipeline.s3_uploader)
+        # Initialize Runway Engine (dynamically to use updated settings)
+        from core.runway_engine import RunwayEngine
+        runway_key = settings.runway_api_key
+        # Use GCS uploader for reference images
+        engine = RunwayEngine(api_key=runway_key, gcs_uploader=pipeline.gcs_uploader)
         
         output_path = job_dir / "replaced_runway.mp4"
         
@@ -1862,27 +1865,40 @@ async def replace_with_runway(
                 buffer_seconds=0.5  # Small buffer for smooth transitions
             )
             
-            # Step 2: Upload clip to S3 for Runway
-            if pipeline.s3_uploader:
+            # Step 2: Upload clip to GCS for Runway
+            if pipeline.gcs_uploader:
                 try:
-                    logger.info(f"📤 Uploading clip to S3 for Runway...")
-                    clip_s3_key = f"jobs/{job_id}/runway_clip_{actual_start}_{actual_end}.mp4"
-                    video_url = pipeline.s3_uploader.upload_video(clip_path, clip_s3_key)
-                    logger.info(f"✅ Clip uploaded to S3: {video_url}")
+                    logger.info(f"📤 Uploading clip to GCS for Runway...")
+                    clip_gcs_key = f"jobs/{job_id}/runway_clip_{actual_start}_{actual_end}.mp4"
+                    video_url = pipeline.gcs_uploader.upload_video(clip_path, clip_gcs_key)
+                    logger.info(f"✅ Clip uploaded to GCS: {video_url}")
                 except Exception as e:
-                    logger.warning(f"Failed to upload clip to S3: {e}")
+                    logger.warning(f"Failed to upload clip to GCS: {e}")
                     raise HTTPException(
                         status_code=400,
-                        detail="Failed to upload clip to S3. Runway requires a publicly accessible URL."
+                        detail="Failed to upload clip to GCS. Runway requires a publicly accessible URL."
                     )
         else:
             # No smart clipping - use the full video
-            video_url = job.s3_url
+            # If no GCS URL, we must upload the full video
+            if not job.gcs_url:
+                if pipeline.gcs_uploader:
+                    logger.info("Uploading full video to GCS for Runway...")
+                    key = f"jobs/{job.job_id}/input.mp4"
+                    job.gcs_url = pipeline.gcs_uploader.upload_video(job.video_path, key)
+                    pipeline._save_job_state(job.job_id)
+                else:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Runway requires a publicly accessible video URL. GCS uploader not configured."
+                    )
+            
+            video_url = job.gcs_url
         
         if not video_url:
             raise HTTPException(
                 status_code=400, 
-                detail="Runway requires a publicly accessible video URL. Please re-upload the video to generate an S3 URL."
+                detail="Runway requires a publicly accessible video URL. Please re-upload the video to generate a GCS URL."
             )
         
         logger.info(f"Using video URL for Runway: {video_url}")
