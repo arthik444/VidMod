@@ -418,7 +418,7 @@ async def detect_object(
 
 
 @router.post("/replace", response_model=ReplacementResponse)
-async def replace_object(
+async def replace_object_basic(
     request: ReplacementRequest,
     background_tasks: BackgroundTasks,
     pipeline: VideoPipeline = Depends(get_pipeline)
@@ -496,30 +496,6 @@ async def get_job_status(
     )
 
 
-@router.get("/download/{job_id}")
-async def download_video(
-    job_id: str,
-    pipeline: VideoPipeline = Depends(get_pipeline)
-):
-    """Download the processed video."""
-    job = pipeline.get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    if job.stage != PipelineStage.COMPLETED:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Job not complete. Current status: {job.stage.value}"
-        )
-    
-    if not job.output_path or not job.output_path.exists():
-        raise HTTPException(status_code=404, detail="Output file not found")
-    
-    return FileResponse(
-        path=job.output_path,
-        filename=f"vidmod_{job_id}.mp4",
-        media_type="video/mp4"
-    )
 
 
 @router.get("/preview/{job_id}/frame/{index}")
@@ -748,7 +724,7 @@ async def segment_video_with_sam3(
 
 
 @router.post("/replace-object", response_model=ReplaceObjectResponse)
-async def replace_object(
+async def replace_object_wan(
     request: ReplaceObjectRequest,
     pipeline: VideoPipeline = Depends(get_pipeline)
 ):
@@ -1182,76 +1158,6 @@ async def replace_with_nano_banana(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/replace-with-pika", response_model=PikaReplaceResponse)
-async def replace_with_pika(
-    job_id: str,
-    prompt: str,
-    reference_image: UploadFile,
-    negative_prompt: str = "blurry, distorted, low quality, deformed",
-    duration: int = 5,
-    pipeline: VideoPipeline = Depends(get_pipeline)
-):
-    """
-    Replace object in video using Pika Labs Pikadditions. ⭐⭐
-    
-    BEST FOR: Shape-changing object replacement (cup → bottle).
-    Uses Pika v2 which is better at complete object swaps than VACE.
-    
-    Workflow:
-    1. Upload video
-    2. Call this endpoint with prompt + reference image
-    
-    Note: Pika processes the whole video, no SAM mask required!
-    """
-    from pathlib import Path
-    from core.pika_engine import PikaEngine
-    from app.config import get_settings
-    
-    job = pipeline.get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-    
-    if not job.video_path:
-        raise HTTPException(status_code=400, detail="No video found. Upload video first.")
-    
-    # Save reference image
-    job_dir = Path(f"storage/jobs/{job_id}")
-    reference_path = job_dir / f"pika_ref_{reference_image.filename}"
-    with open(reference_path, 'wb') as f:
-        content = await reference_image.read()
-        f.write(content)
-    
-    logger.info(f"Saved Pika reference image: {reference_path}")
-    
-    try:
-        settings = get_settings()
-        engine = PikaEngine(api_key=settings.fal_key)
-        
-        output_path = job_dir / "replaced_pika.mp4"
-        
-        result_path = engine.replace_and_download(
-            video_path=job.video_path,
-            output_path=output_path,
-            prompt=prompt,
-            reference_image_path=reference_path,
-            negative_prompt=negative_prompt,
-            duration=duration
-        )
-        
-        job.output_path = result_path
-        
-        return PikaReplaceResponse(
-            job_id=job_id,
-            status="completed",
-            download_path=f"/api/download/{job_id}",
-            message=f"Object replaced using Pika Labs: {prompt}"
-        )
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Pika replacement failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/download-segmented/{job_id}")

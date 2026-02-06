@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Loader2, Download, EyeOff, RefreshCw, CheckCircle2, AlertTriangle, Plus, Mic2, Volume2, Wand2, Clock } from 'lucide-react';
+import { X, Loader2, Download, EyeOff, RefreshCw, CheckCircle2, AlertTriangle, Plus, Mic2, Volume2, Wand2, Clock, Sparkles } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import {
@@ -375,251 +375,206 @@ const ActionModal: React.FC<ActionModalProps> = ({
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-500" onClick={onClose} />
 
-            {/* Modal */}
-            <div className="relative z-10 w-full max-w-[440px] max-h-[75vh] flex flex-col bg-[#09090b] rounded-[32px] border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-                <div className="flex items-center justify-between p-6 pb-2">
-                    <div className="space-y-1">
-                        <h2 className="font-bold text-xl tracking-tight flex items-center gap-2.5 text-white">
-                            {actionType.includes('replace') ? <RefreshCw className="w-5 h-5 text-accent/60" /> : <EyeOff className="w-5 h-5 text-accent/60" />}
-                            {getTitle()}
+            {/* Modal - Responsive */}
+            <div className="relative z-10 w-full max-w-[90vw] sm:max-w-[440px] max-h-[90vh] sm:max-h-[75vh] flex flex-col bg-[#09090b] rounded-2xl sm:rounded-[32px] border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.8),0_0_0_1px_rgba(255,255,255,0.05)] overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+                <div className="flex items-center justify-between p-4 sm:p-6 sm:pb-2">
+                    <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">
+                        <h2 className="font-bold text-lg sm:text-xl tracking-tight flex items-center gap-2 sm:gap-2.5 text-white">
+                            {actionType.includes('replace') ? <RefreshCw className="w-4 h-4 sm:w-5 sm:h-5 text-accent/60 shrink-0" /> : <EyeOff className="w-4 h-4 sm:w-5 sm:h-5 text-accent/60 shrink-0" />}
+                            <span className="truncate">{getTitle()}</span>
                         </h2>
-                        <p className="text-[11px] text-muted-foreground font-medium tracking-wide uppercase opacity-50 px-0.5">{getDescription()}</p>
+                        <p className="text-[10px] sm:text-[11px] text-muted-foreground font-medium tracking-wide uppercase opacity-50 px-0.5 truncate hidden sm:block">{getDescription()}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 text-muted-foreground hover:text-white transition-all duration-200">
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-white/5 text-muted-foreground hover:text-white transition-all duration-200 shrink-0 ml-2 cursor-pointer">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 sm:space-y-6 custom-scrollbar">
 
-                    <div className="space-y-3">
-                        <div className="flex items-center justify-between px-1">
-                            <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 flex items-center gap-2">
-                                Scene Target
-                                {status === 'detecting' && <Loader2 className="w-3 h-3 animate-spin text-accent" />}
-                            </label>
+                    {/* Target Selection (Common) */}
+                    {(actionType === 'blur' || actionType === 'mask' || actionType.includes('replace')) && (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <label className="label-sm flex items-center gap-2">
+                                    Target Object
+                                    {status === 'detecting' && <Loader2 className="w-3 h-3 animate-spin text-zinc-500" />}
+                                </label>
 
-                            {/* Suggestions */}
-                            {suggestions.length > 0 && (
-                                <div className="flex gap-2">
-                                    {suggestions.map((s) => (
-                                        <button
-                                            key={s}
-                                            onClick={() => setObjectPrompt(s)}
-                                            className={cn(
-                                                "text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border transition-all duration-300",
-                                                objectPrompt === s
-                                                    ? "bg-white text-black border-white"
-                                                    : "bg-white/5 hover:bg-white/10 border-white/5 text-muted-foreground"
-                                            )}
-                                        >
-                                            {s}
-                                        </button>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
+                                {suggestions.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {suggestions.map((s) => (
+                                            <button
+                                                key={s}
+                                                onClick={() => setObjectPrompt(s)}
+                                                className={cn(
+                                                    "badge transition-colors cursor-pointer",
+                                                    objectPrompt === s ? "bg-white text-zinc-900 border-white" : "hover:bg-white/5"
+                                                )}
+                                            >
+                                                {s}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
-                        <div className="relative group">
                             <input
                                 value={objectPrompt}
                                 onChange={(e) => setObjectPrompt(e.target.value)}
                                 className={cn(
-                                    "w-full px-5 py-4 bg-white/[0.02] rounded-2xl border text-sm font-medium focus:outline-none transition-all duration-300 placeholder:text-muted-foreground/20",
-                                    status === 'detecting'
-                                        ? "border-accent/40 animate-pulse bg-accent/[0.03]"
-                                        : "border-white/5 hover:border-white/10 focus:border-white/20 focus:bg-white/[0.04] focus:ring-4 focus:ring-white/[0.02]"
+                                    "input",
+                                    status === 'detecting' && "border-zinc-600 animate-pulse"
                                 )}
-                                placeholder={status === 'detecting' ? "Analyzing frames..." : "Describe the object (e.g., 'the red backpack')"}
+                                placeholder={status === 'detecting' ? "Analyzing..." : "Describe the object (e.g., 'the red backpack')"}
                             />
                         </div>
-                    </div>
+                    )}
 
                     {/* Mask Only Checkbox */}
                     {(actionType === 'blur' || actionType === 'mask') && (
-                        <div className="flex items-center gap-3 px-1">
-                            <label className="flex items-center gap-2.5 cursor-pointer group">
-                                <div className="relative flex items-center justify-center">
+                        <div className="surface-2 rounded-xl p-3 border border-border">
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <div className="relative flex items-center justify-center shrink-0">
                                     <input
                                         type="checkbox"
                                         checked={maskOnly}
                                         onChange={(e) => setMaskOnly(e.target.checked)}
                                         className="peer sr-only"
                                     />
-                                    <div className="w-5 h-5 border border-white/10 rounded-md bg-white/10 peer-checked:bg-accent peer-checked:border-accent transition-all duration-200" />
-                                    <CheckCircle2 className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform duration-200" />
+                                    <div className="w-4 h-4 rounded border border-zinc-700 bg-zinc-900 peer-checked:bg-white peer-checked:border-white transition-all" />
+                                    <CheckCircle2 className="absolute w-3 h-3 text-zinc-900 opacity-0 peer-checked:opacity-100 transition-opacity" />
                                 </div>
-                                <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">Mask only (no overlay color)</span>
+                                <span className="text-xs text-zinc-400 group-hover:text-zinc-200 transition-colors">Mask only (apply effect to segment only)</span>
                             </label>
                         </div>
                     )}
 
-                    {/* Replacement Fields */}
+                    {/* Replacement Specific Fields */}
                     {actionType.includes('replace') && (
-                        <>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Replacement Prompt</label>
+                        <div className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="label-sm">Replacement Prompt</label>
                                 <input
                                     type="text"
                                     value={replacementPrompt}
                                     onChange={(e) => setReplacementPrompt(e.target.value)}
                                     placeholder="e.g., red Coca-Cola can"
-                                    className="w-full px-4 py-3 bg-[#111113] rounded-xl border border-white/10 text-sm focus:border-accent/80 focus:outline-none focus:ring-1 focus:ring-accent/20 transition-all font-medium"
+                                    className="input"
                                 />
                             </div>
 
-                            {/* Reference image only for Pika - Runway is text-only */}
-                            {actionType === 'replace-pika' && (
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground">Reference Image (Required)</label>
-                                    <div className="relative group">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => setReferenceImage(e.target.files?.[0] || null)}
-                                            className="w-full px-4 py-3 bg-[#111113] border border-white/10 rounded-xl text-sm file:mr-4 file:px-4 file:py-1 file:rounded-lg file:border-0 file:bg-accent/20 file:text-accent file:text-xs file:font-bold hover:border-white/20 transition-all cursor-pointer"
-                                        />
-                                    </div>
-                                    {referenceImage && <p className="text-[11px] text-emerald-400/80 flex items-center gap-1.5 px-0.5">
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        {referenceImage.name}
-                                    </p>}
-                                </div>
-                            )}
-
+                            {/* Runway Smart Clipping Info */}
                             {actionType === 'replace-runway' && startTime !== undefined && endTime !== undefined && (
-                                <div className="p-4 bg-accent/[0.03] border border-accent/10 rounded-2xl space-y-3">
-                                    <div className="flex items-center gap-2">
-
-                                        <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-accent/80">Smart Clipping Active</span>
+                                <div className="surface-2 border border-border rounded-xl overflow-hidden">
+                                    <div className="p-3 bg-white/3 border-b border-border flex items-center justify-between">
+                                        <span className="label-sm !text-zinc-300">Smart Clipping</span>
+                                        <div className="badge badge-success !text-[10px]">Active</div>
                                     </div>
-                                    <div className="flex gap-6">
-                                        <div className="space-y-1">
-                                            <span className="text-[9px] uppercase font-bold text-muted-foreground/40 block">Start Point</span>
-                                            <span className="font-mono text-sm text-foreground/80">{startTime.toFixed(2)}s</span>
+                                    <div className="p-4 flex items-center justify-around gap-4 text-center">
+                                        <div className="space-y-1 flex-1">
+                                            <span className="label-sm !text-[9px] !text-zinc-500 block">Start</span>
+                                            <span className="mono text-sm text-zinc-200">{startTime.toFixed(2)}s</span>
                                         </div>
-                                        <div className="w-px h-8 bg-white/5" />
-                                        <div className="space-y-1">
-                                            <span className="text-[9px] uppercase font-bold text-muted-foreground/40 block">End Point</span>
-                                            <span className="font-mono text-sm text-foreground/80">{endTime.toFixed(2)}s</span>
+                                        <div className="divider-v !h-8 opacity-50" />
+                                        <div className="space-y-1 flex-1">
+                                            <span className="label-sm !text-[9px] !text-zinc-500 block">End</span>
+                                            <span className="mono text-sm text-zinc-200">{endTime.toFixed(2)}s</span>
                                         </div>
                                     </div>
-                                    <p className="text-[10px] text-muted-foreground/50 italic leading-relaxed">System will isolate and process only the specified temporal segment.</p>
+                                    <div className="p-3 bg-white/3 text-[10px] text-zinc-500 text-center border-t border-border">
+                                        Precision temporal processing enabled
+                                    </div>
                                 </div>
                             )}
 
-                            {/* Reference Image Options for Runway */}
-                            {actionType === 'replace-runway' && (
+                            {/* Pika Reference Image Option */}
+                            {actionType === 'replace-pika' && (
                                 <div className="space-y-3">
-                                    <label className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground flex items-center gap-2">
-                                        <Sparkles className="w-3 h-3 text-accent" />
-                                        Reference Image (Optional - for grounded replacement)
-                                    </label>
-
-                                    {/* Generate with AI Section */}
-                                    <div className="p-4 bg-gradient-to-br from-accent/[0.03] to-purple-500/[0.03] border border-accent/20 rounded-2xl space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-accent/80">Generate with Gemini 3</span>
-                                            {generatedImageUrl && (
-                                                <span className="text-[9px] font-medium text-emerald-400 flex items-center gap-1">
-                                                    <CheckCircle2 className="w-3 h-3" />
-                                                    Ready to use
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="flex gap-2">
-                                            <input
-                                                type="text"
-                                                value={imagePrompt || replacementPrompt}
-                                                onChange={(e) => setImagePrompt(e.target.value)}
-                                                placeholder="e.g., Coca-Cola bottle, product shot"
-                                                className="flex-1 px-3 py-2 bg-[#111113] border border-white/10 rounded-xl text-sm focus:border-accent/60 focus:outline-none transition-all"
-                                            />
-                                            <button
-                                                onClick={handleGenerateImage}
-                                                disabled={isGeneratingImage}
-                                                className="flex items-center gap-2 px-4 py-2 bg-accent/20 hover:bg-accent/30 disabled:opacity-50 text-accent rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
-                                            >
-                                                {isGeneratingImage ? (
-                                                    <><Loader2 className="w-3.5 h-3.5 animate-spin" />Generating...</>
-                                                ) : generatedImageUrl ? (
-                                                    <><RefreshCw className="w-3.5 h-3.5" />Regenerate</>
-                                                ) : (
-                                                    <><Sparkles className="w-3.5 h-3.5" />Generate</>
-                                                )}
-                                            </button>
-                                        </div>
-
-                                        {/* Generated Image Preview */}
-                                        {generatedImageUrl && (
-                                            <div className="relative group">
-                                                <img
-                                                    src={generatedImageUrl}
-                                                    alt="Generated reference"
-                                                    className="w-full h-32 object-contain bg-[#0a0a0c] border border-white/10 rounded-xl"
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-end justify-center pb-3">
-                                                    <span className="text-[10px] font-bold text-white/80 uppercase tracking-wider">AI Generated</span>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Divider */}
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex-1 h-px bg-white/10" />
-                                        <span className="text-[9px] font-bold text-muted-foreground/40 uppercase tracking-widest">or upload</span>
-                                        <div className="flex-1 h-px bg-white/10" />
-                                    </div>
-
-                                    {/* Upload Option */}
-                                    <div className="relative group">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                                setReferenceImage(e.target.files?.[0] || null);
-                                                setGeneratedImageUrl(''); // Clear generated image when uploading
-                                                setGeneratedImagePath('');
-                                            }}
-                                            className="w-full px-4 py-3 bg-[#111113] border border-white/10 rounded-xl text-sm file:mr-4 file:px-4 file:py-1 file:rounded-lg file:border-0 file:bg-white/10 file:text-muted-foreground file:text-xs file:font-bold hover:border-white/20 transition-all cursor-pointer"
-                                        />
-                                    </div>
+                                    <label className="label-sm">Reference Image (Required)</label>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => setReferenceImage(e.target.files?.[0] || null)}
+                                        className="input file:mr-3 file:px-3 file:py-1 file:rounded-md file:border-0 file:bg-zinc-700 file:text-zinc-300 file:text-xs file:font-medium cursor-pointer"
+                                    />
                                     {referenceImage && (
-                                        <p className="text-[11px] text-emerald-400/80 flex items-center gap-1.5 px-0.5">
+                                        <p className="text-xs text-emerald-400 flex items-center gap-1.5">
                                             <CheckCircle2 className="w-3 h-3" />
                                             {referenceImage.name}
                                         </p>
                                     )}
                                 </div>
                             )}
-                        </>
+
+                            {/* AI Image Generation Option for Runway/Generic Replace */}
+                            {actionType === 'replace-runway' && (
+                                <div className="card !bg-surface-2 border-border/50 p-4 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <label className="label-sm flex items-center gap-2 !text-zinc-400">
+                                            <Sparkles className="w-3.5 h-3.5 text-zinc-500" />
+                                            Gemini Image Generator
+                                        </label>
+                                        {generatedImageUrl && (
+                                            <span className="badge badge-success !text-[10px]">
+                                                <CheckCircle2 className="w-3 h-3" />
+                                                Ready
+                                            </span>
+                                        )}
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            value={imagePrompt || replacementPrompt}
+                                            onChange={(e) => setImagePrompt(e.target.value)}
+                                            placeholder="Describe scene..."
+                                            className="input text-xs"
+                                        />
+                                        <button
+                                            onClick={handleGenerateImage}
+                                            disabled={isGeneratingImage}
+                                            className="btn-secondary !text-[10px] !px-3 shrink-0"
+                                        >
+                                            {isGeneratingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Generate'}
+                                        </button>
+                                    </div>
+
+                                    {generatedImageUrl && (
+                                        <div className="relative group">
+                                            <img
+                                                src={generatedImageUrl}
+                                                alt="Generated reference"
+                                                className="w-full h-32 object-contain bg-[#0a0a0c] border border-white/10 rounded-xl"
+                                            />
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-end justify-center pb-3">
+                                                <span className="text-[10px] font-bold text-white/80 uppercase tracking-wider">AI Generated</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     )}
 
-
-                    {/* Enhanced Word Replacement with Gemini Suggestions (for voice dub mode) */}
+                    {/* Word Replacement with Gemini Suggestions (for voice dub mode) */}
                     {actionType === 'censor-dub' && (
-                        <div className="space-y-3">
-                            <div className="flex flex-col gap-3 p-3 bg-white/[0.02] border border-white/5 rounded-2xl">
+                        <div className="space-y-4">
+                            <div className="card !bg-surface-2 border-border/50 p-4 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60">
-                                            ElevenLabs Dub Engine
-                                        </label>
-                                        <p className="text-[9px] text-muted-foreground/40 font-medium">Select synthesis strategy</p>
+                                    <div className="space-y-0.5">
+                                        <label className="label-sm !text-zinc-300">ElevenLabs Dub Engine</label>
+                                        <p className="text-[10px] text-zinc-500">Select synthesis strategy</p>
                                     </div>
-                                    <div className="flex bg-black/40 p-1.5 rounded-xl border border-white/5">
+                                    <div className="flex bg-zinc-900 p-1 rounded-lg border border-border">
                                         {(['auto', 'clone', 'beep'] as const).map((m) => (
                                             <button
                                                 key={m}
                                                 onClick={() => setDubMode(m)}
                                                 className={cn(
-                                                    "px-2.5 py-1 rounded-md text-[9px] font-bold uppercase tracking-widest transition-all duration-300",
-                                                    dubMode === m
-                                                        ? "bg-white text-black shadow-xl"
-                                                        : "text-muted-foreground/60 hover:text-white"
+                                                    "px-3 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider transition-all",
+                                                    dubMode === m ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-white"
                                                 )}
                                             >
                                                 {m}
@@ -629,81 +584,63 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                 </div>
 
                                 <div className="flex items-center justify-between pt-1">
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center justify-center w-9 h-9 rounded-full bg-white/5 border border-white/5 shadow-inner">
-                                            <Mic2 className="w-4.5 h-4.5 text-white/80" />
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center border border-border">
+                                            <Mic2 className="w-4 h-4 text-zinc-400" />
                                         </div>
                                         <div className="space-y-0.5">
-                                            <span className="text-[12px] font-bold text-white tracking-wide block leading-none">
+                                            <span className="text-xs font-semibold text-white block">
                                                 {dubMode === 'auto' ? 'Self-Cloning' : dubMode === 'clone' ? 'Precision Target' : 'Fast Semantic Mask'}
                                             </span>
-                                            <p className="text-[10px] text-muted-foreground/50 leading-none">
-                                                {dubMode === 'auto' ? 'Multi-speaker cloning' :
-                                                    dubMode === 'clone' ? 'Source-specific fidelity' :
-                                                        'High-speed censorship'}
+                                            <p className="text-[10px] text-zinc-500">
+                                                {dubMode === 'auto' ? 'Multi-speaker cloning' : dubMode === 'clone' ? 'Source-specific fidelity' : 'High-speed censorship'}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={handleAddSegment}
-                                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-white/80 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-300 border border-white/5"
-                                        >
-                                            <Plus className="w-3.5 h-3.5" />
-                                            Manual
+                                        <button onClick={handleAddSegment} className="btn-secondary !p-2">
+                                            <Plus className="w-4 h-4" />
                                         </button>
                                         <button
                                             onClick={handleManualGenerate}
                                             disabled={loadingSuggestions || profanityMatches.length === 0}
-                                            className="flex items-center gap-2 px-4 py-2 bg-white text-black disabled:opacity-30 disabled:cursor-not-allowed rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-300 shadow-xl shadow-white/5"
+                                            className="btn-primary !text-[10px] !px-3"
                                         >
-                                            {loadingSuggestions ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            ) : (
-                                                <Wand2 className="w-3.5 h-3.5" />
-                                            )}
-                                            Suggest
+                                            {loadingSuggestions ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wand2 className="w-3.5 h-3.5" />}
+                                            <span className="hidden sm:inline ml-1">Suggest</span>
                                         </button>
                                     </div>
                                 </div>
 
-                                {/* Voice Cloning Sample Selector */}
                                 {dubMode === 'clone' && (
-                                    <div className="mt-2 p-5 bg-white/[0.03] border border-white/5 rounded-2xl space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center">
-                                                    <Volume2 className="w-4 h-4 text-white/40" />
-                                                </div>
-                                                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">Clone Source Range</span>
-                                            </div>
-                                            <span className="text-[9px] text-muted-foreground/30 font-mono tracking-tight">5-10s sample</span>
+                                    <div className="mt-2 p-4 surface-3 border border-border rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <div className="flex items-center gap-3">
+                                            <Volume2 className="w-3.5 h-3.5 text-zinc-500" />
+                                            <span className="label-sm !text-zinc-400">Clone Source Range</span>
                                         </div>
-                                        <div className="flex gap-4">
-                                            <div className="flex-1 space-y-2">
-                                                <label className="text-[8px] font-bold uppercase text-muted-foreground/40 ml-1 tracking-[0.1em]">Start Time</label>
-                                                <div className="flex items-center gap-3 bg-black/60 rounded-xl px-4 py-3 border border-white/5 group focus-within:border-white/20 transition-all">
-                                                    <Clock className="w-3.5 h-3.5 text-muted-foreground/40 group-focus-within:text-white/60 transition-colors" />
+                                        <div className="flex gap-3">
+                                            <div className="flex-1 space-y-1">
+                                                <label className="text-[9px] font-bold uppercase text-zinc-600 block pl-1">Start</label>
+                                                <div className="flex items-center gap-2 bg-zinc-900 rounded-lg px-3 py-2 border border-border">
+                                                    <Clock className="w-3 h-3 text-zinc-600" />
                                                     <input
                                                         type="number"
                                                         value={voiceSampleStart}
                                                         onChange={(e) => setVoiceSampleStart(parseFloat(e.target.value))}
-                                                        className="bg-transparent border-none text-xs font-bold font-mono w-full focus:ring-0 p-0 text-white/90"
+                                                        className="bg-transparent border-none text-xs font-mono w-full focus:ring-0 p-0 text-white"
                                                     />
-                                                    <span className="text-[10px] opacity-20 font-mono">s</span>
                                                 </div>
                                             </div>
-                                            <div className="flex-1 space-y-2">
-                                                <label className="text-[8px] font-bold uppercase text-muted-foreground/40 ml-1 tracking-[0.1em]">End Time</label>
-                                                <div className="flex items-center gap-3 bg-black/60 rounded-xl px-4 py-3 border border-white/5 group focus-within:border-white/20 transition-all">
-                                                    <Clock className="w-3.5 h-3.5 text-muted-foreground/40 group-focus-within:text-white/60 transition-colors" />
+                                            <div className="flex-1 space-y-1">
+                                                <label className="text-[9px] font-bold uppercase text-zinc-600 block pl-1">End</label>
+                                                <div className="flex items-center gap-2 bg-zinc-900 rounded-lg px-3 py-2 border border-border">
+                                                    <Clock className="w-3 h-3 text-zinc-600" />
                                                     <input
                                                         type="number"
                                                         value={voiceSampleEnd}
                                                         onChange={(e) => setVoiceSampleEnd(parseFloat(e.target.value))}
-                                                        className="bg-transparent border-none text-xs font-bold font-mono w-full focus:ring-0 p-0 text-white/90"
+                                                        className="bg-transparent border-none text-xs font-mono w-full focus:ring-0 p-0 text-white"
                                                     />
-                                                    <span className="text-[10px] opacity-20 font-mono">s</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -711,58 +648,29 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                 )}
                             </div>
 
-                            {loadingSuggestions && profanityMatches.length === 0 ? (
-                                <div className="p-6 bg-white/[0.02] border border-white/5 rounded-xl text-center space-y-2">
-                                    <Loader2 className="w-5 h-5 animate-spin mx-auto text-white/20" />
-                                    <p className="text-[10px] text-muted-foreground/40 italic">Synthesizing alternatives...</p>
-                                </div>
-                            ) : profanityMatches.length === 0 ? (
-                                <div className="p-6 bg-white/[0.02] border border-white/5 rounded-xl text-center space-y-2">
-                                    <p className="text-[10px] text-muted-foreground/40 font-medium uppercase tracking-widest">No segments identified</p>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {profanityMatches.map((match, index) => (
-                                        <div key={index} className="p-5 bg-white/[0.02] border border-white/5 rounded-[24px] space-y-5 group hover:bg-white/[0.04] hover:border-white/10 transition-all duration-300">
-                                            {/* Word to Replace */}
-                                            <div className="flex items-start justify-between gap-5">
-                                                <div className="space-y-4 flex-1">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/20">Temporal Metadata</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="flex items-center gap-1.5 bg-black/40 rounded-lg px-2 py-1 border border-white/5">
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.1"
-                                                                    value={match.start_time}
-                                                                    onChange={(e) => {
-                                                                        const updated = [...profanityMatches];
-                                                                        updated[index].start_time = parseFloat(e.target.value);
-                                                                        setProfanityMatches(updated);
-                                                                    }}
-                                                                    className="w-12 bg-transparent border-none text-[10px] p-0 font-bold font-mono text-white/60 focus:ring-0"
-                                                                />
-                                                                <span className="text-[8px] font-bold opacity-20 font-mono">s</span>
-                                                            </div>
-                                                            <span className="text-[10px] font-bold opacity-10">/</span>
-                                                            <div className="flex items-center gap-1.5 bg-black/40 rounded-lg px-2 py-1 border border-white/5">
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.1"
-                                                                    value={match.end_time}
-                                                                    onChange={(e) => {
-                                                                        const updated = [...profanityMatches];
-                                                                        updated[index].end_time = parseFloat(e.target.value);
-                                                                        setProfanityMatches(updated);
-                                                                    }}
-                                                                    className="w-12 bg-transparent border-none text-[10px] p-0 font-bold font-mono text-white/60 focus:ring-0"
-                                                                />
-                                                                <span className="text-[8px] font-bold opacity-20 font-mono">s</span>
+                            {/* Profanity Match Cards */}
+                            <div className="space-y-3">
+                                {loadingSuggestions && profanityMatches.length === 0 ? (
+                                    <div className="p-8 surface-2 border border-border rounded-xl text-center space-y-3">
+                                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-zinc-500" />
+                                        <p className="text-xs text-zinc-500 italic">Synthesizing alternatives...</p>
+                                    </div>
+                                ) : profanityMatches.length === 0 ? (
+                                    <div className="p-8 surface-2 border border-border rounded-xl text-center">
+                                        <p className="text-xs text-zinc-500 font-medium uppercase tracking-widest">No segments identified</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {profanityMatches.map((match, index) => (
+                                            <div key={index} className="card p-4 space-y-4 hover:border-zinc-700 transition-colors">
+                                                <div className="flex items-start justify-between gap-4">
+                                                    <div className="space-y-3 flex-1">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="label-sm !text-zinc-600 uppercase tracking-widest !text-[9px]">Segment {index + 1}</span>
+                                                            <div className="flex items-center gap-1.5 bg-zinc-900 rounded px-2 py-0.5 border border-border">
+                                                                <span className="text-[10px] mono text-zinc-400">{match.start_time.toFixed(1)}s - {match.end_time.toFixed(1)}s</span>
                                                             </div>
                                                         </div>
-                                                    </div>
-
-                                                    <div className="relative">
                                                         <input
                                                             value={match.word}
                                                             onChange={(e) => {
@@ -770,87 +678,84 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                                                 updated[index].word = e.target.value;
                                                                 setProfanityMatches(updated);
                                                             }}
-                                                            className="w-full px-4 py-3 bg-red-500/[0.02] border border-red-500/10 rounded-xl text-sm font-bold text-red-100 placeholder:text-red-900/20 focus:outline-none focus:border-red-500/30 transition-all"
-                                                            placeholder="Segment identifier..."
+                                                            className="w-full bg-red-500/5 border border-red-500/20 rounded-lg px-3 py-2 text-sm font-medium text-red-200 focus:outline-none focus:border-red-500/40"
+                                                            placeholder="Word/Phrase"
                                                         />
                                                     </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            const updated = profanityMatches.filter((_, i) => i !== index);
+                                                            setProfanityMatches(updated);
+                                                        }}
+                                                        className="btn-ghost !p-2 text-zinc-600 hover:text-red-400"
+                                                    >
+                                                        <X className="w-4 h-4" />
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    onClick={() => {
-                                                        const updated = profanityMatches.filter((_, i) => i !== index);
-                                                        setProfanityMatches(updated);
-                                                    }}
-                                                    className="p-2 bg-white/5 hover:bg-red-500/10 rounded-xl text-muted-foreground/20 hover:text-red-400 transition-all duration-300 border border-transparent hover:border-red-500/20"
-                                                >
-                                                    <X className="w-4 h-4" />
-                                                </button>
-                                            </div>
 
-                                            {/* Replacement Prompt */}
-                                            <div className="space-y-3 pt-4 border-t border-white/5">
-                                                <div className="flex items-center gap-2 px-1">
-                                                    <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-white/40">Dub Target Context</span>
+                                                <div className="space-y-2 pt-3 border-t border-border">
+                                                    <label className="label-sm !text-zinc-500">Replacement</label>
+                                                    <input
+                                                        type="text"
+                                                        value={match.replacement}
+                                                        onChange={(e) => {
+                                                            const updated = [...profanityMatches];
+                                                            updated[index].replacement = e.target.value;
+                                                            setProfanityMatches(updated);
+                                                        }}
+                                                        placeholder="Alternative text..."
+                                                        className="input text-xs"
+                                                    />
+                                                    {match.suggestions && match.suggestions.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1.5 mt-2">
+                                                            {match.suggestions.map((suggestion, i) => (
+                                                                <button
+                                                                    key={i}
+                                                                    onClick={() => {
+                                                                        const updated = [...profanityMatches];
+                                                                        updated[index].replacement = suggestion;
+                                                                        setProfanityMatches(updated);
+                                                                    }}
+                                                                    className={cn(
+                                                                        "badge cursor-pointer",
+                                                                        match.replacement === suggestion ? "bg-white text-zinc-900 border-white" : "hover:bg-white/5"
+                                                                    )}
+                                                                >
+                                                                    {suggestion}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <input
-                                                    type="text"
-                                                    value={match.replacement}
-                                                    onChange={(e) => {
-                                                        const updated = [...profanityMatches];
-                                                        updated[index].replacement = e.target.value;
-                                                        setProfanityMatches(updated);
-                                                    }}
-                                                    placeholder="Synthesize alternative text..."
-                                                    className="w-full px-5 py-3.5 bg-black/40 border border-white/5 rounded-2xl text-sm font-bold focus:outline-none focus:border-white/20 text-white transition-all duration-300"
-                                                />
-                                                {match.suggestions && match.suggestions.length > 0 && (
-                                                    <div className="flex flex-wrap gap-1.5 mt-3 px-1">
-                                                        {match.suggestions.map((suggestion, i) => (
-                                                            <button
-                                                                key={i}
-                                                                onClick={() => {
-                                                                    const updated = [...profanityMatches];
-                                                                    updated[index].replacement = suggestion;
-                                                                    setProfanityMatches(updated);
-                                                                }}
-                                                                className={cn(
-                                                                    "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all duration-300",
-                                                                    match.replacement === suggestion
-                                                                        ? "bg-white text-black shadow-lg"
-                                                                        : "bg-white/5 hover:bg-white/10 text-muted-foreground/40 hover:text-white border border-white/5"
-                                                                )}
-                                                            >
-                                                                {suggestion}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
                                             </div>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Synthesis Banner */}
+                            <div className="surface-2 rounded-xl p-3 border border-border flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                    <span className="label-sm !text-zinc-500 !text-[9px]">Intelligent Synthesis Active</span>
                                 </div>
-                            )}
-                            <div className="p-3 bg-white/[0.05] border border-white/10 rounded-xl flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[9px] uppercase font-bold tracking-[0.1em] text-muted-foreground/40">
-                                        Intelligent Synthesis Active
-                                    </span>
-                                </div>
+                                <Sparkles className="w-3 h-3 text-zinc-700" />
                             </div>
                         </div>
                     )}
 
                     {/* Status Messages */}
-                    <div className="px-4 py-2 flex flex-col gap-2">
+                    <div className="space-y-2">
                         {status === 'error' && (
-                            <div className="flex items-center gap-2 p-2.5 bg-red-500/[0.03] border border-red-500/10 rounded-xl text-red-400 text-[10px] font-bold animate-in slide-in-from-top-2 duration-300">
-                                <AlertTriangle className="w-3.5 h-3.5" />
+                            <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-semibold animate-in slide-in-from-top-2">
+                                <AlertTriangle className="w-4 h-4 shrink-0" />
                                 <span>{error}</span>
                             </div>
                         )}
 
                         {status === 'completed' && (
-                            <div className="flex items-center gap-2 p-2.5 bg-emerald-500/[0.03] border border-emerald-500/10 rounded-xl text-emerald-400 text-[10px] font-bold animate-in slide-in-from-top-2 duration-300">
-                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                            <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-400 text-xs font-semibold animate-in slide-in-from-top-2">
+                                <CheckCircle2 className="w-4 h-4 shrink-0" />
                                 <span>Operation Successful</span>
                             </div>
                         )}
@@ -858,17 +763,18 @@ const ActionModal: React.FC<ActionModalProps> = ({
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-4 p-6 pt-2 bg-white/[0.02] border-t border-white/5">
+                <div className="flex items-center justify-end gap-3 p-4 sm:p-6 border-t border-border surface-2">
                     {status === 'completed' && downloadUrl && (
-                        <a href={downloadUrl} download className="btn-primary flex items-center gap-2 bg-emerald-500 text-white border-emerald-400/20 hover:bg-emerald-400 active:scale-95">
+                        <a href={downloadUrl} download className="btn-primary bg-emerald-500 hover:bg-emerald-400 text-white text-xs sm:text-sm">
                             <Download className="w-4 h-4" />
-                            Export Result
+                            <span className="hidden sm:inline">Export Result</span>
+                            <span className="sm:hidden">Export</span>
                         </a>
                     )}
 
                     <button
                         onClick={onClose}
-                        className="px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 hover:text-white transition-all duration-300"
+                        className="btn-ghost text-xs cursor-pointer"
                     >
                         {status === 'completed' ? 'Close' : 'Cancel'}
                     </button>
@@ -877,9 +783,13 @@ const ActionModal: React.FC<ActionModalProps> = ({
                         <button
                             onClick={handleExecute}
                             disabled={status === 'processing' || status === 'detecting' || (actionType === 'replace-pika' && !referenceImage)}
-                            className="bg-white text-black px-8 py-3.5 rounded-2xl text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white/90 active:scale-95 transition-all disabled:opacity-20 flex items-center gap-2"
+                            className="btn-primary text-xs sm:text-sm"
                         >
-                            {status === 'processing' ? <><Loader2 className="w-4 h-4 animate-spin" />Processing</> : 'Apply Modifications'}
+                            {status === 'processing' ? (
+                                <><Loader2 className="w-4 h-4 animate-spin" />Processing</>
+                            ) : (
+                                <><span className="hidden sm:inline">Apply Modifications</span><span className="sm:hidden">Apply</span></>
+                            )}
                         </button>
                     )}
                 </div>
