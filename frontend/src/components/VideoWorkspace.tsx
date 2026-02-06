@@ -229,15 +229,13 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
         return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
     };
 
-    const handleManualEditConfirm = (box: any, action: 'blur' | 'replace' | 'replace-pika' | 'replace-runway' | 'mute', label?: string, reasoning?: string) => {
+    const handleManualEditConfirm = (box: any, action: 'blur' | 'replace' | 'replace-runway' | 'mute', label?: string, reasoning?: string) => {
         if (!onAddFinding) return;
 
         const type = action === 'blur' ? 'Manual Blur'
-            : action === 'replace' ? 'Manual Replace (VACE)'
-                : action === 'replace-pika' ? 'Manual Replace (Pika)'
-                    : action === 'replace-runway' ? 'Manual Replace (Runway)'
-                        : 'Manual Mute';
-        const category = action === 'blur' || action === 'replace' || action === 'replace-pika' || action === 'replace-runway' ? 'logo' : 'language';
+            : action === 'replace' || action === 'replace-runway' ? 'Manual Replace'
+                : 'Manual Mute';
+        const category = action === 'blur' || action === 'replace' || action === 'replace-runway' ? 'logo' : 'language';
         const content = label || `User defined ${action} area`;
 
         onAddFinding({
@@ -263,7 +261,7 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
         <div className="flex flex-col h-full gap-4" onMouseMove={resetControlsTimer}>
             <div
                 ref={containerRef}
-                className="flex-1 relative rounded-xl border border-border bg-black overflow-hidden group shadow-2xl"
+                className="flex-1 relative rounded-lg border border-border bg-black overflow-hidden group"
             >
                 <div
                     className="w-full h-full flex items-center justify-center bg-black"
@@ -341,19 +339,19 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                 </div>
 
                 {!isPlaying && videoUrl && !isEditMode && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[1px] pointer-events-none">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
                         <button
-                            className="w-20 h-20 flex items-center justify-center rounded-full bg-accent text-white shadow-2xl scale-100 hover:scale-110 transition-transform pointer-events-auto cursor-pointer"
+                            className="w-16 h-16 flex items-center justify-center rounded-full bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 transition-all pointer-events-auto cursor-pointer"
                             onClick={togglePlay}
                         >
-                            <Play className="fill-current w-8 h-8 ml-1" />
+                            <Play className="fill-current w-7 h-7 ml-0.5" />
                         </button>
                     </div>
                 )}
 
                 <div className={cn(
-                    "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/90 via-black/40 to-transparent transition-opacity duration-300 z-50",
-                    showControls ? "opacity-100" : "opacity-0 invisible"
+                    "absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent transition-opacity duration-200 z-50",
+                    showControls ? "opacity-100" : "opacity-0 pointer-events-none"
                 )}>
                     <div className="flex flex-col gap-3">
                         <div
@@ -389,8 +387,10 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                                 >
                                     <SkipForward className="w-5 h-5" />
                                 </button>
-                                <div className="text-xs font-mono text-white select-none bg-black/50 px-2 py-1 rounded">
-                                    <span className="font-bold">{formatTime(currentTime)}</span> / {formatTime(duration)}
+                                <div className="text-xs text-white/90 select-none mono">
+                                    <span className="font-medium">{formatTime(currentTime)}</span>
+                                    <span className="text-white/40 mx-1">/</span>
+                                    <span className="text-white/60">{formatTime(duration)}</span>
                                 </div>
 
                                 <div className="h-4 w-[1px] bg-white/20 mx-1" />
@@ -401,14 +401,14 @@ const VideoWorkspace: React.FC<VideoWorkspaceProps> = ({ videoUrl, jobId, seekTo
                                         if (isPlaying) videoRef.current?.pause();
                                     }}
                                     className={cn(
-                                        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer",
+                                        "flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer",
                                         isEditMode
-                                            ? "bg-accent text-white shadow-lg"
-                                            : "bg-white/10 text-white/80 hover:bg-white/20 hover:text-white"
+                                            ? "bg-white text-zinc-900"
+                                            : "bg-white/10 text-white/80 hover:bg-white/15"
                                     )}
                                 >
-                                    <PencilLine className="w-4 h-4" />
-                                    {isEditMode ? 'Editing...' : 'Manual Edit'}
+                                    <PencilLine className="w-3.5 h-3.5" />
+                                    {isEditMode ? 'Editing' : 'Edit'}
                                 </button>
 
                                 {/* Toggle overlays button */}

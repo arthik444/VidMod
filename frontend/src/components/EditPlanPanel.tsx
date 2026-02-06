@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ChevronDown, AlertCircle, VolumeX, EyeOff, ShieldCheck, Play, RefreshCw, Grid, Search, X, Loader2, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, AlertCircle, VolumeX, EyeOff, ShieldCheck, Play, RefreshCw, Grid, Search, X, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ActionModal, { type ActionType } from './ActionModal';
+import BatchProcessModal, { type BatchFindingConfig } from './BatchProcessModal';
 import { generateReferenceImage } from '../services/api';
 
 function cn(...inputs: ClassValue[]) {
@@ -171,18 +172,6 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
     // State for batch review modal
     const [showBatchReviewModal, setShowBatchReviewModal] = useState(false);
 
-    // Batch findings configuration (editable in modal)
-    interface BatchFindingConfig {
-        finding: Finding;
-        selected: boolean;
-        effectType: 'blur' | 'pixelate' | 'replace-runway' | 'censor-beep' | 'censor-dub';
-        prompt: string;  // Object to target
-        replacementPrompt: string;  // What to replace with (Runway only)
-        referenceImagePath?: string;  // AI-generated reference image path (Runway only)
-        startTime: number;  // Editable timestamp
-        endTime: number;    // Editable timestamp
-    }
-
     const [batchConfigs, setBatchConfigs] = useState<BatchFindingConfig[]>([]);
 
     // State for batch image generation
@@ -206,7 +195,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
             if (isAudioFinding) {
                 // Audio-based finding -> use audio actions
                 defaultEffect = 'censor-beep';
-            } else if (f.suggestedAction?.toLowerCase().includes('runway')) {
+            } else if (f.suggestedAction?.toLowerCase().includes('runway') || f.suggestedAction?.toLowerCase() === 'replace') {
                 defaultEffect = 'replace-runway';
             } else if (f.suggestedAction?.toLowerCase().includes('pixelate')) {
                 defaultEffect = 'pixelate';
@@ -219,7 +208,15 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                 prompt: f.content,
                 replacementPrompt: '',
                 startTime: f.startTime,
-                endTime: f.endTime
+                endTime: f.endTime,
+                intensity: 30, // Default intensity
+                beepWords: isAudioFinding ? [f.content.trim().toLowerCase()] : [],
+                profanityMatches: (defaultEffect as string) === 'censor-dub' ? [{
+                    word: f.content,
+                    start_time: f.startTime,
+                    end_time: f.endTime,
+                    replacement: ''
+                }] : []
             };
         });
         setBatchConfigs(configs);
@@ -251,7 +248,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     const result = await blurObject(
                         jobId,
                         config.prompt,
-                        30,
+                        config.intensity || 30,
                         config.effectType,
                         config.startTime,  // Use editable timestamp
                         config.endTime     // Use editable timestamp
@@ -295,8 +292,9 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                         mode,
                         undefined, // voiceSampleStart
                         undefined, // voiceSampleEnd
-                        undefined, // customWords
-                        undefined  // customReplacements - could add UI for this later
+                        config.beepWords,
+                        undefined, // customReplacements
+                        config.effectType === 'censor-dub' ? config.profanityMatches : undefined
                     );
 
                     if (result && result.download_path) {
@@ -484,7 +482,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     className="flex items-center gap-1 px-2 py-1 bg-secondary/20 hover:bg-secondary/30 border border-border rounded text-[9px] font-bold uppercase transition-colors disabled:opacity-50"
                 >
                     <RefreshCw className="w-3 h-3" />
-                    Runway
+                    Replace
                 </button>
             );
         }
@@ -493,35 +491,13 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
         if (step.iconType === 'replace' || step.finding.category === 'logo') {
             buttons.push(
                 <button
-                    key="replace-vace"
-                    onClick={(e) => handleApplyAction(step, 'replace-vace', e)}
-                    disabled={!jobId}
-                    className="flex items-center gap-1 px-2 py-1 bg-secondary/20 hover:bg-secondary/30 border border-border rounded text-[9px] font-bold uppercase transition-colors disabled:opacity-50"
-                >
-                    <RefreshCw className="w-3 h-3" />
-                    VACE
-                </button>
-            );
-            buttons.push(
-                <button
-                    key="replace-pika"
-                    onClick={(e) => handleApplyAction(step, 'replace-pika', e)}
-                    disabled={!jobId}
-                    className="flex items-center gap-1 px-2 py-1 bg-secondary/20 hover:bg-secondary/30 border border-border rounded text-[9px] font-bold uppercase transition-colors disabled:opacity-50"
-                >
-                    <Play className="w-3 h-3" />
-                    Pika
-                </button>
-            );
-            buttons.push(
-                <button
                     key="replace-runway"
                     onClick={(e) => handleApplyAction(step, 'replace-runway', e)}
                     disabled={!jobId}
                     className="flex items-center gap-1 px-2 py-1 bg-secondary/20 hover:bg-secondary/30 border border-border rounded text-[9px] font-bold uppercase transition-colors disabled:opacity-50"
                 >
                     <RefreshCw className="w-3 h-3" />
-                    Runway
+                    Replace
                 </button>
             );
         }
@@ -787,278 +763,36 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
             </div>
 
             {/* Batch Review Modal */}
-            {showBatchReviewModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-                    <div className="absolute inset-0 bg-[#030303]/95 backdrop-blur-xl animate-in fade-in duration-300" onClick={() => setShowBatchReviewModal(false)} />
-                    <div className="relative z-10 w-full max-w-4xl max-h-[90vh] bg-[#0a0a0c] border border-white/10 shadow-[0_32px_128px_rgba(0,0,0,0.8)] rounded-[32px] overflow-hidden flex flex-col font-mono animate-in fade-in zoom-in-95 duration-200">
-                        <div className="flex items-center justify-between p-5 border-b border-white/5 bg-white/[0.02]">
-                            <h2 className="font-bold text-[11px] uppercase tracking-[0.2em] text-white/80">Batch Pipeline Configuration</h2>
-                            <button onClick={() => setShowBatchReviewModal(false)} className="p-2 rounded-xl hover:bg-white/5 text-muted-foreground hover:text-white transition-all">
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-                            {batchConfigs.map((config, index) => (
-                                <div
-                                    key={index}
-                                    className={cn(
-                                        "p-6 border transition-all duration-200 rounded-[20px] space-y-5 group",
-                                        config.selected
-                                            ? "border-accent/40 bg-[#111114] shadow-[0_16px_48px_rgba(0,0,0,0.6)]"
-                                            : "border-white/5 bg-[#0c0c0e] hover:border-white/10"
-                                    )}
-                                >
-                                    {/* Header: Detection Type + Timestamp */}
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <label className="relative flex items-center justify-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={config.selected}
-                                                    onChange={(e) => {
-                                                        const updated = [...batchConfigs];
-                                                        updated[index].selected = e.target.checked;
-                                                        setBatchConfigs(updated);
-                                                    }}
-                                                    className="peer sr-only"
-                                                />
-                                                <div className="w-5 h-5 border border-white/10 rounded-lg bg-[#050505] peer-checked:bg-accent peer-checked:border-accent transition-all duration-200" />
-                                                <CheckCircle2 className="absolute w-3.5 h-3.5 text-white scale-0 peer-checked:scale-100 transition-transform duration-200" />
-                                            </label>
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-accent uppercase tracking-[0.15em]">
-                                                    {config.finding.type}
-                                                </span>
-                                                <span className="text-[9px] font-medium text-muted-foreground/30 uppercase tracking-wider">
-                                                    Compliance Detection Segment
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <div className="px-3 py-1 bg-[#050505] border border-white/5 rounded-lg flex items-center gap-2 text-[10px] font-bold text-muted-foreground/60 font-mono">
-                                            <Play className="w-3 h-3 text-accent/40" />
-                                            {Math.floor(config.finding.startTime / 60)}:{String(Math.floor(config.finding.startTime % 60)).padStart(2, '0')} - {Math.floor(config.finding.endTime / 60)}:{String(Math.floor(config.finding.endTime % 60)).padStart(2, '0')}
-                                        </div>
-                                    </div>
-
-                                    {/* Violation Content - High Contrast Minimalism */}
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2 px-1">
-                                            <div className="w-1 h-3 bg-red-500/40 rounded-full" />
-                                            <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-muted-foreground/40">Raw Detection Data</span>
-                                        </div>
-                                        <textarea
-                                            value={config.prompt}
-                                            onChange={(e) => {
-                                                const updated = [...batchConfigs];
-                                                updated[index].prompt = e.target.value;
-                                                setBatchConfigs(updated);
-                                            }}
-                                            className="w-full px-4 py-3 text-[11px] bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-red-500/30 resize-none font-mono text-foreground/70 transition-all leading-relaxed"
-                                            rows={2}
-                                        />
-                                    </div>
-
-                                    {/* Remediation Parameters */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[9px] uppercase font-bold text-muted-foreground/20 tracking-widest pl-1">Start Bound (s)</label>
-                                            <input
-                                                type="number"
-                                                value={config.startTime}
-                                                onChange={(e) => {
-                                                    const updated = [...batchConfigs];
-                                                    updated[index].startTime = parseFloat(e.target.value) || 0;
-                                                    setBatchConfigs(updated);
-                                                }}
-                                                step="0.1"
-                                                className="w-full px-3 py-2 text-[11px] bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-accent/40 font-mono text-foreground/80"
-                                            />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[9px] uppercase font-bold text-muted-foreground/20 tracking-widest pl-1">End Bound (s)</label>
-                                            <input
-                                                type="number"
-                                                value={config.endTime}
-                                                onChange={(e) => {
-                                                    const updated = [...batchConfigs];
-                                                    updated[index].endTime = parseFloat(e.target.value) || config.startTime;
-                                                    setBatchConfigs(updated);
-                                                }}
-                                                step="0.1"
-                                                className="w-full px-3 py-2 text-[11px] bg-[#050505] border border-white/10 rounded-xl focus:outline-none focus:border-accent/40 font-mono text-foreground/80"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Action Selector Bar - Solid Elements */}
-                                    <div className="pt-4 border-t border-white/5 flex items-center justify-between">
-                                        <div className="flex gap-1.5">
-                                            {(config.finding.type?.toLowerCase().includes('profanity') ||
-                                                config.finding.type?.toLowerCase().includes('strong language') ||
-                                                config.finding.type?.toLowerCase().includes('offensive') ||
-                                                config.finding.type?.toLowerCase().includes('language') ||
-                                                config.finding.category === 'language') ? (
-                                                ['censor-beep', 'censor-dub'].map((type) => (
-                                                    <button
-                                                        key={type}
-                                                        onClick={() => {
-                                                            const updated = [...batchConfigs];
-                                                            updated[index].effectType = type as any;
-                                                            setBatchConfigs(updated);
-                                                        }}
-                                                        className={cn(
-                                                            "px-4 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all duration-200",
-                                                            config.effectType === type
-                                                                ? "bg-accent text-white border-accent"
-                                                                : "bg-[#050505] border-white/5 text-muted-foreground/40 hover:text-white hover:border-white/20"
-                                                        )}
-                                                    >
-                                                        {type.replace('censor-', '')}
-                                                    </button>
-                                                ))
-                                            ) : (
-                                                ['blur', 'pixelate', 'replace-runway'].map((type) => (
-                                                    <button
-                                                        key={type}
-                                                        onClick={() => {
-                                                            const updated = [...batchConfigs];
-                                                            updated[index].effectType = type as any;
-                                                            setBatchConfigs(updated);
-                                                        }}
-                                                        className={cn(
-                                                            "px-4 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider border transition-all duration-200",
-                                                            config.effectType === type
-                                                                ? "bg-accent text-white border-accent"
-                                                                : "bg-[#050505] border-white/5 text-muted-foreground/40 hover:text-white hover:border-white/20"
-                                                        )}
-                                                    >
-                                                        {type.replace('replace-', '')}
-                                                    </button>
-                                                ))
-                                            )}
-                                        </div>
-
-                                        {config.effectType === 'replace-runway' && (
-                                            <div className="flex items-center gap-2 px-3 py-1.5 bg-accent/10 border border-accent/20 rounded-lg">
-                                                <span className="text-[9px] font-bold uppercase tracking-wider text-accent">Active Synthesis</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Action Content Box */}
-                                    {config.effectType === 'replace-runway' && (
-                                        <div className="animate-in fade-in slide-in-from-top-1 duration-200 space-y-3">
-                                            <div className="p-4 bg-[#050505] border border-white/5 rounded-2xl space-y-2">
-                                                <span className="text-[9px] font-bold uppercase tracking-[0.1em] text-accent/60 block px-1">Synthesis Logic Script</span>
-                                                <input
-                                                    type="text"
-                                                    value={config.replacementPrompt}
-                                                    onChange={(e) => {
-                                                        const updated = [...batchConfigs];
-                                                        updated[index].replacementPrompt = e.target.value;
-                                                        setBatchConfigs(updated);
-                                                    }}
-                                                    placeholder="Input replacement context..."
-                                                    className="w-full px-3 py-2 text-[11px] bg-transparent border-b border-white/10 focus:outline-none focus:border-accent/40 font-mono text-accent transition-all placeholder:text-muted-foreground/5"
-                                                />
-                                            </div>
-
-                                            {/* Reference Image Generation */}
-                                            <div className="p-3 bg-gradient-to-br from-accent/[0.02] to-purple-500/[0.02] border border-accent/10 rounded-xl space-y-2">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[8px] font-bold uppercase tracking-[0.1em] text-accent/50">
-                                                        Reference Image (AI)
-                                                    </span>
-                                                    {generatedImages[index] && (
-                                                        <span className="text-[8px] font-medium text-emerald-400 flex items-center gap-1">
-                                                            <CheckCircle2 className="w-2.5 h-2.5" />
-                                                            Ready
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                <div className="flex gap-2">
-                                                    <button
-                                                        onClick={async () => {
-                                                            if (!jobId || !config.replacementPrompt.trim()) return;
-                                                            setGeneratingImageIndex(index);
-                                                            try {
-                                                                const result = await generateReferenceImage(jobId, config.replacementPrompt, '1:1');
-                                                                setGeneratedImages(prev => ({
-                                                                    ...prev,
-                                                                    [index]: { url: `http://localhost:8000${result.image_url}`, path: result.image_path }
-                                                                }));
-                                                                // Update the config with the path
-                                                                const updated = [...batchConfigs];
-                                                                updated[index].referenceImagePath = result.image_path;
-                                                                setBatchConfigs(updated);
-                                                            } catch (err) {
-                                                                console.error('Image generation failed:', err);
-                                                            } finally {
-                                                                setGeneratingImageIndex(null);
-                                                            }
-                                                        }}
-                                                        disabled={generatingImageIndex === index || !config.replacementPrompt.trim()}
-                                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-accent/10 hover:bg-accent/20 disabled:opacity-40 text-accent rounded-lg text-[9px] font-bold uppercase tracking-wider transition-all"
-                                                    >
-                                                        {generatingImageIndex === index ? (
-                                                            <><Loader2 className="w-3 h-3 animate-spin" />Gen...</>
-                                                        ) : generatedImages[index] ? (
-                                                            <><RefreshCw className="w-3 h-3" />Regen</>
-                                                        ) : (
-                                                            <><Sparkles className="w-3 h-3" />Generate</>
-                                                        )}
-                                                    </button>
-
-                                                    {generatedImages[index] && (
-                                                        <img
-                                                            src={generatedImages[index].url}
-                                                            alt="Reference"
-                                                            className="w-10 h-10 object-cover rounded-lg border border-white/10"
-                                                        />
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Critical Duration Warning */}
-                                    {(config.endTime - config.startTime) > 15 && (
-                                        <div className="flex items-center gap-2 px-3 py-2 bg-red-500/5 border border-red-500/10 rounded-xl">
-                                            <AlertCircle className="w-3.5 h-3.5 text-red-500/40" />
-                                            <span className="text-[9px] text-red-500/60 font-bold uppercase tracking-widest">Temporal Bound Overflow (15s+)</span>
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-                        </div>
-
-                        <div className="p-5 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
-                            <div className="flex items-center gap-3 pl-2">
-                                <span className="text-[10px] font-bold text-muted-foreground/20 uppercase tracking-[0.2em]">
-                                    {batchConfigs.filter(c => c.selected).length} Target Segments Selected
-                                </span>
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={() => setShowBatchReviewModal(false)}
-                                    className="px-6 py-2.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted-foreground/60 hover:text-white hover:bg-white/5 rounded-xl transition-all"
-                                >
-                                    Abort
-                                </button>
-                                <button
-                                    onClick={processBatchFindings}
-                                    disabled={batchConfigs.filter(c => c.selected).length === 0}
-                                    className="px-8 py-2.5 btn-primary text-[10px] font-bold uppercase tracking-[0.2em] shadow-accent/10 disabled:opacity-20 disabled:grayscale transition-all"
-                                >
-                                    Push Pipeline
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Batch Review Modal */}
+            <BatchProcessModal
+                isOpen={showBatchReviewModal}
+                onClose={() => setShowBatchReviewModal(false)}
+                batchConfigs={batchConfigs}
+                onUpdateConfigs={setBatchConfigs}
+                onProcess={processBatchFindings}
+                generatingImageIndex={generatingImageIndex}
+                generatedImages={generatedImages}
+                onGenerateImage={async (index) => {
+                    const config = batchConfigs[index];
+                    if (!jobId || !config.replacementPrompt.trim()) return;
+                    setGeneratingImageIndex(index);
+                    try {
+                        const result = await generateReferenceImage(jobId, config.replacementPrompt, '1:1');
+                        setGeneratedImages(prev => ({
+                            ...prev,
+                            [index]: { url: `http://localhost:8000${result.image_url}`, path: result.image_path }
+                        }));
+                        // Update the config with the path
+                        const updated = [...batchConfigs];
+                        updated[index].referenceImagePath = result.image_path;
+                        setBatchConfigs(updated);
+                    } catch (err) {
+                        console.error('Image generation failed:', err);
+                    } finally {
+                        setGeneratingImageIndex(null);
+                    }
+                }}
+            />
 
             {/* Action Modal */}
             {modalOpen && selectedStep && jobId && (

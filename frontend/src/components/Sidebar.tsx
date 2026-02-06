@@ -6,8 +6,6 @@ import {
     FileVideo,
     ShieldCheck,
     ChevronDown,
-    ChevronUp,
-    Video,
     Settings
 } from 'lucide-react';
 import { type VideoMetadata } from './UploadZone';
@@ -32,45 +30,42 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata, po
     const menuItems = [
         { id: 'Upload', icon: Upload, label: 'Upload' },
         { id: 'Analysis', icon: BarChart3, label: 'Analysis' },
-        { id: 'Compliance', icon: FileText, label: 'Compliance Report' },
+        { id: 'Compliance', icon: FileText, label: 'Report' },
     ];
 
-    const getActionColor = (action: string) => {
+    const getActionBadge = (action: string) => {
         switch (action) {
-            case RemediationAction.ALLOWED: return 'text-emerald-400';
-            case RemediationAction.BLOCK_SEGMENT: return 'text-red-400';
+            case RemediationAction.ALLOWED:
+                return 'badge-success';
+            case RemediationAction.BLOCK_SEGMENT:
+                return 'badge-error';
             case RemediationAction.PIXELATE:
-            case RemediationAction.BLUR: return 'text-amber-400';
-            case RemediationAction.OBJECT_REPLACE: return 'text-blue-400';
-            default: return 'text-accent';
+            case RemediationAction.BLUR:
+                return 'badge-warning';
+            default:
+                return 'badge';
         }
     };
 
     return (
-        <aside className="w-64 border-r border-border flex flex-col bg-[#0a0a0c]/80 backdrop-blur-xl">
-            <div className="p-6 overflow-y-auto no-scrollbar flex-1">
-                <div className="flex items-center gap-3 mb-10 px-2">
-                    <div className="w-6 h-6 rounded bg-zinc-800 border border-white/5 flex items-center justify-center">
-                        <Video className="w-3.5 h-3.5 text-zinc-400" />
-                    </div>
-                    <span className="font-bold text-[11px] uppercase tracking-[0.2em] text-white/90">VidMod AI</span>
-                </div>
-
-                <nav className="space-y-1.5 mb-10">
+        <aside className="w-60 border-r border-border flex flex-col surface-1">
+            {/* Navigation */}
+            <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+                <nav className="space-y-1">
                     {menuItems.map((item) => (
                         <button
                             key={item.id}
                             onClick={() => setActiveTab(item.id)}
                             className={cn(
-                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[10px] font-bold uppercase tracking-[0.15em] transition-all group cursor-pointer",
+                                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer",
                                 activeTab === item.id
-                                    ? "bg-white/[0.04] text-white border border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.4)]"
-                                    : "text-zinc-500 hover:bg-white/[0.02] hover:text-zinc-300 border border-transparent"
+                                    ? "surface-3 text-zinc-100 border border-border-strong"
+                                    : "text-zinc-500 hover:surface-2 hover:text-zinc-300 border border-transparent"
                             )}
                         >
                             <item.icon className={cn(
-                                "w-3.5 h-3.5",
-                                activeTab === item.id ? "text-white" : "text-zinc-600 group-hover:text-zinc-400"
+                                "w-4 h-4",
+                                activeTab === item.id ? "text-zinc-300" : "text-zinc-600"
                             )} />
                             {item.label}
                         </button>
@@ -79,38 +74,39 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata, po
 
                 {/* Policy Section */}
                 {policy && (
-                    <div className="space-y-4">
+                    <div className="mt-6 pt-4 border-t border-border">
                         <button
                             onClick={() => setShowPolicies(!showPolicies)}
-                            className="w-full flex items-center justify-between text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer px-2"
+                            className="w-full flex items-center justify-between text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer px-1 py-2"
                         >
                             <div className="flex items-center gap-2">
-                                <ShieldCheck className="w-3.5 h-3.5" />
-                                <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Enforcement</span>
+                                <ShieldCheck className="w-4 h-4" />
+                                <span className="text-xs font-medium">Enforcement</span>
                             </div>
-                            {showPolicies ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            <ChevronDown className={cn(
+                                "w-4 h-4 transition-transform duration-200",
+                                showPolicies && "rotate-180"
+                            )} />
                         </button>
 
                         {showPolicies && (
-                            <div className="bg-white/[0.02] rounded-2xl p-4 border border-white/5 space-y-3.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <div className="mt-2 space-y-2">
                                 {Object.entries(policy.rules).map(([category, action]) => {
                                     if (action === RemediationAction.ALLOWED) return null;
                                     return (
-                                        <div key={category} className="flex flex-col gap-1.5">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[10px] font-bold text-zinc-500 capitalize tracking-wide">
-                                                    {category.replace('_', ' ')}
-                                                </span>
-                                                <span className={cn("text-[9px] font-bold px-2 py-0.5 rounded-full bg-white/[0.03] border border-white/5", getActionColor(action))}>
-                                                    {action}
-                                                </span>
-                                            </div>
+                                        <div key={category} className="flex items-center justify-between px-1 py-1.5">
+                                            <span className="text-xs text-zinc-500 capitalize">
+                                                {category.replace('_', ' ')}
+                                            </span>
+                                            <span className={getActionBadge(action)}>
+                                                {action}
+                                            </span>
                                         </div>
                                     );
                                 })}
                                 {Object.values(policy.rules).every(a => a === RemediationAction.ALLOWED) && (
-                                    <div className="text-[10px] text-emerald-500/80 font-bold text-center py-2 tracking-widest uppercase">
-                                        Compliance Clear
+                                    <div className="badge-success text-center py-2 w-full justify-center">
+                                        Compliant
                                     </div>
                                 )}
                             </div>
@@ -119,28 +115,29 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, metadata, po
                 )}
             </div>
 
-            <div className="p-6 border-t border-white/5 space-y-6">
+            {/* Footer */}
+            <div className="p-4 border-t border-border space-y-4">
                 {metadata && (
-                    <div className="space-y-3 pb-2">
+                    <div className="space-y-2">
                         <div className="flex items-center gap-2 text-zinc-600 px-1">
-                            <FileVideo className="w-3.5 h-3.5" />
-                            <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Source Meta</span>
+                            <FileVideo className="w-4 h-4" />
+                            <span className="text-xs font-medium">Source</span>
                         </div>
-                        <div className="bg-white/[0.02] rounded-xl p-4 border border-white/5 flex flex-col gap-3">
-                            <div className="flex justify-between items-center text-[10px]">
-                                <span className="text-zinc-500 font-bold uppercase tracking-wider">Resolution</span>
-                                <span className="font-mono text-zinc-300">{metadata.resolution}</span>
+                        <div className="surface-2 rounded-lg p-3 space-y-2">
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-zinc-500">Resolution</span>
+                                <span className="text-xs text-zinc-300 mono">{metadata.resolution}</span>
                             </div>
-                            <div className="flex justify-between items-center text-[10px]">
-                                <span className="text-zinc-500 font-bold uppercase tracking-wider">Size</span>
-                                <span className="font-mono text-zinc-300">{metadata.size}</span>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-zinc-500">Size</span>
+                                <span className="text-xs text-zinc-300 mono">{metadata.size}</span>
                             </div>
                         </div>
                     </div>
                 )}
-                <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 hover:bg-white/[0.02] hover:text-zinc-300 transition-all cursor-pointer">
+                <button className="btn-ghost w-full justify-start">
                     <Settings className="w-4 h-4" />
-                    System
+                    Settings
                 </button>
             </div>
         </aside>
