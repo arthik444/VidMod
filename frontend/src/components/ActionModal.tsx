@@ -13,7 +13,8 @@ import {
     censorAudio,
     analyzeAudio,
     suggestReplacements,
-    generateReferenceImage
+    generateReferenceImage,
+    API_BASE
 } from '../services/api';
 
 function cn(...inputs: ClassValue[]) {
@@ -223,7 +224,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
         setIsGeneratingImage(true);
         try {
             const result = await generateReferenceImage(jobId, promptToUse, '1:1');
-            setGeneratedImageUrl(`http://localhost:8000${result.image_url}`);
+            setGeneratedImageUrl(`${API_BASE.replace('/api', '')}${result.image_url}`);
             setGeneratedImagePath(result.image_path);
         } catch (err) {
             console.error('Image generation failed:', err);

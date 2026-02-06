@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
+import { API_BASE, generateReferenceImage } from '../services/api';
 import { ChevronDown, AlertCircle, VolumeX, EyeOff, ShieldCheck, Play, RefreshCw, Grid, Search, X, Loader2 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import ActionModal, { type ActionType } from './ActionModal';
 import BatchProcessModal, { type BatchFindingConfig } from './BatchProcessModal';
-import { generateReferenceImage } from '../services/api';
+
 
 function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -215,7 +216,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     );
 
                     if (result && result.download_path) {
-                        lastDownloadUrl = `http://localhost:8000${result.download_path}`;
+                        lastDownloadUrl = `${API_BASE.replace('/api', '')}${result.download_path}`;
                     }
                 } else if (config.effectType === 'replace-runway') {
                     // Runway: text-only replacement with Smart Clipping
@@ -239,7 +240,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     );
 
                     if (result && result.download_path) {
-                        lastDownloadUrl = `http://localhost:8000${result.download_path}`;
+                        lastDownloadUrl = `${API_BASE.replace('/api', '')}${result.download_path}`;
                     }
                 } else if (config.effectType === 'censor-beep' || config.effectType === 'censor-dub') {
                     // Audio censoring for profanity
@@ -258,7 +259,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     );
 
                     if (result && result.download_path) {
-                        lastDownloadUrl = `http://localhost:8000${result.download_path}`;
+                        lastDownloadUrl = `${API_BASE.replace('/api', '')}${result.download_path}`;
                     } else {
                         lastDownloadUrl = getDownloadUrl(jobId);
                     }
@@ -335,7 +336,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     // Combine all object names into a single prompt for SAM3
                     const combinedPrompt = objectNames.join(', ');
 
-                    const response = await fetch('http://localhost:8000/api/blur-object', {
+                    const response = await fetch(`${API_BASE}/blur-object`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -740,7 +741,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                         const result = await generateReferenceImage(jobId, config.replacementPrompt, '1:1');
                         setGeneratedImages(prev => ({
                             ...prev,
-                            [index]: { url: `http://localhost:8000${result.image_url}`, path: result.image_path }
+                            [index]: { url: `${API_BASE.replace('/api', '')}${result.image_url}`, path: result.image_path }
                         }));
                         // Update the config with the path
                         const updated = [...batchConfigs];

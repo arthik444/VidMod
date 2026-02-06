@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { API_BASE } from '../services/api';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 import VideoWorkspace, { type Finding } from './VideoWorkspace';
@@ -96,7 +97,7 @@ const AppLayout: React.FC = () => {
             params.append('region', region);
             params.append('rating', rating);
 
-            const response = await fetch(`http://localhost:8000/api/analyze-video/${uploadedJobId}?${params.toString()}`, {
+            const response = await fetch(`${API_BASE}/analyze-video/${uploadedJobId}?${params.toString()}`, {
                 method: 'POST',
             });
 
@@ -147,7 +148,7 @@ const AppLayout: React.FC = () => {
             params.append('region', region);
             params.append('rating', rating);
 
-            const response = await fetch(`http://localhost:8000/api/analyze-video/${jobId}?${params.toString()}`, {
+            const response = await fetch(`${API_BASE}/analyze-video/${jobId}?${params.toString()}`, {
                 method: 'POST',
             });
 

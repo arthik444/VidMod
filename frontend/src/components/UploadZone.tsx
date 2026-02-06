@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { Upload as UploadIcon, X, Loader2, Check, ChevronDown, Video } from 'lucide-react';
+import { API_BASE } from '../services/api';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Platform, Region, Rating } from '../services/policyEngine';
@@ -125,7 +126,7 @@ const UploadZone: React.FC<UploadZoneProps> = ({
             const formData = new FormData();
             formData.append('file', file);
 
-            const response = await fetch('http://localhost:8000/api/upload', {
+            const response = await fetch(`${API_BASE}/upload`, {
                 method: 'POST',
                 body: formData,
             });
