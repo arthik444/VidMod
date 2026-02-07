@@ -435,9 +435,9 @@ class ElevenLabsDubber:
         Seamlessly patch dubbed audio segments onto video.
         
         This method:
-        1. Mutes original audio at precise timestamps
-        2. Overlays dubbed audio with crossfade blending
-        3. Mixes all tracks for seamless result
+        1. Separates vocals from instrumental using AI (preserves background music)
+        2. Mutes only the vocals track at precise timestamps
+        3. Mixes dubbed audio with untouched instrumental
         
         Args:
             video_path: Input video file
@@ -455,8 +455,133 @@ class ElevenLabsDubber:
         
         logger.info(f"Patching {len(dub_segments)} audio segments onto video...")
         
-        # Step 1: Mute original audio at word timestamps
-        # Increased padding to 0.05s to ensure total removal of original words
+        # Try AI-based audio separation first
+        try:
+            from core.audio_separator import AudioSeparator
+            
+            separator = AudioSeparator(ffmpeg_path=self.ffmpeg_path)
+            vocals_path, instrumental_path = separator.separate_vocals_and_music(video_path)
+            
+            logger.info("Using AI-separated audio tracks for clean dubbing")
+            return self._patch_with_separated_audio(
+                video_path=video_path,
+                vocals_path=vocals_path,
+                instrumental_path=instrumental_path,
+                dub_segments=dub_segments,
+                output_path=output_path
+            )
+        except Exception as e:
+            logger.warning(f"Audio separation failed, falling back to frequency ducking: {e}")
+            return self._patch_with_frequency_ducking(
+                video_path=video_path,
+                dub_segments=dub_segments,
+                output_path=output_path
+            )
+    
+    def _patch_with_separated_audio(
+        self,
+        video_path: Path,
+        vocals_path: Path,
+        instrumental_path: Path,
+        dub_segments: list,
+        output_path: Path
+    ) -> Path:
+        """
+        Patch audio using AI-separated vocals and instrumental tracks.
+        Mutes only the vocals during dub segments, preserving background music.
+        """
+        logger.info("Patching with separated audio (vocals muted, instrumental preserved)")
+        
+        # Build volume conditions for muting vocals
+        volume_conditions = []
+        for _, start_time, end_time in dub_segments:
+            padding = 0.1
+            start_p = max(0, start_time - padding)
+            end_p = end_time + padding
+            volume_conditions.append(f"between(t,{start_p:.6f},{end_p:.6f})")
+        
+        mute_expr = "|".join(volume_conditions)
+        filter_parts = []
+        
+        # Input 0: Video (we'll ignore its audio)
+        # Input 1: Vocals track - mute during dub segments
+        # Input 2: Instrumental track - keep untouched
+        # Inputs 3+: Dub segments
+        
+        # Vocals: mute completely during dub segments
+        filter_parts.append(f"[1:a]volume=enable='{mute_expr}':volume=0[muted_vocals]")
+        
+        # Instrumental: keep as-is
+        filter_parts.append("[2:a]acopy[instrumental]")
+        
+        # Process each dubbed segment with crossfades
+        for i, (dub_path, start_time, end_time) in enumerate(dub_segments):
+            delay_ms = int(start_time * 1000)
+            duration = end_time - start_time
+            fade_dur = 0.05
+            fade_out_st = max(0, duration - fade_dur)
+            
+            audio_filters = [
+                f"afade=t=in:d={fade_dur}",
+                f"afade=t=out:st={fade_out_st:.6f}:d={fade_dur}",
+                "highpass=f=80",
+                "volume=1.1"
+            ]
+            filter_chain = ",".join(audio_filters)
+            filter_parts.append(f"[{i+3}:a]{filter_chain},adelay={delay_ms}|{delay_ms}[dub{i}]")
+        
+        # Mix all tracks: muted vocals + instrumental + all dubs
+        inputs_to_mix = ["muted_vocals", "instrumental"] + [f"dub{i}" for i in range(len(dub_segments))]
+        mix_inputs = "".join(f"[{inp}]" for inp in inputs_to_mix)
+        
+        filter_parts.append(
+            f"{mix_inputs}amix=inputs={len(inputs_to_mix)}:duration=first:dropout_transition=0:normalize=0[out]"
+        )
+        
+        filter_complex = ";".join(filter_parts)
+        
+        # Build FFmpeg command
+        cmd = [
+            self.ffmpeg_path, "-y",
+            "-i", str(video_path),        # Input 0: Video
+            "-i", str(vocals_path),        # Input 1: Vocals
+            "-i", str(instrumental_path),  # Input 2: Instrumental
+        ]
+        
+        # Add dub segments as inputs
+        for dub_path, _, _ in dub_segments:
+            cmd.extend(["-i", str(dub_path)])
+        
+        cmd.extend([
+            "-filter_complex", filter_complex,
+            "-map", "0:v",
+            "-map", "[out]",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            str(output_path)
+        ])
+        
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            logger.info(f"✅ Audio patched with separated tracks: {output_path}")
+            return output_path
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Separated audio patching failed: {e.stderr}")
+            raise RuntimeError(f"Failed to patch separated audio: {e.stderr}")
+    
+    def _patch_with_frequency_ducking(
+        self,
+        video_path: Path,
+        dub_segments: list,
+        output_path: Path
+    ) -> Path:
+        """
+        Fallback: Patch audio using frequency-band ducking.
+        Suppresses speech frequencies while preserving some background.
+        """
+        logger.info("Patching with frequency ducking (fallback mode)")
+        
         volume_conditions = []
         for _, start_time, end_time in dub_segments:
             padding = 0.1
@@ -468,22 +593,18 @@ class ElevenLabsDubber:
         filter_parts = []
         
         # Frequency-Band Ducking: Suppress 300Hz-3kHz by -36dB and overall volume to 10%
-        # This keeps the background 'rumble' and 'sizzle' (music/effects) while removing speech
         duck_filter = (
             f"equalizer=f=1000:width_type=h:w=2700:g=-36:enable='{mute_expr}',"
             f"volume=enable='{mute_expr}':volume=0.1"
         )
         filter_parts.append(f"[0:a]{duck_filter}[muted]")
         
-        # Step 2: Process each dubbed segment with refined crossfades (25ms)
         for i, (dub_path, start_time, end_time) in enumerate(dub_segments):
             delay_ms = int(start_time * 1000)
             duration = end_time - start_time
             fade_dur = 0.05
             fade_out_st = max(0, duration - fade_dur)
             
-            # Apply highpass (80Hz) to remove digital bass and volume adjustment (1.1x)
-            # This helps the synthetic voice blend better with natural recording environments
             audio_filters = [
                 f"afade=t=in:d={fade_dur}",
                 f"afade=t=out:st={fade_out_st:.6f}:d={fade_dur}",
@@ -493,51 +614,41 @@ class ElevenLabsDubber:
             filter_chain = ",".join(audio_filters)
             filter_parts.append(f"[{i+1}:a]{filter_chain},adelay={delay_ms}|{delay_ms}[dub{i}]")
         
-        # Step 3: Mix all tracks together
         inputs_to_mix = ["muted"] + [f"dub{i}" for i in range(len(dub_segments))]
         mix_inputs = "".join(f"[{inp}]" for inp in inputs_to_mix)
         
-        # amix with:
-        # - duration=first: use first input's duration (the video)
-        # - dropout_transition=0: no gradual dropout
-        # - normalize=0: don't normalize (preserve volumes)
         filter_parts.append(
             f"{mix_inputs}amix=inputs={len(inputs_to_mix)}:duration=first:dropout_transition=0:normalize=0[out]"
         )
         
         filter_complex = ";".join(filter_parts)
         
-        logger.info(f"FFmpeg filter: {filter_complex[:200]}...")
-        
-        # Build FFmpeg command
         cmd = [
-            self.ffmpeg_path,
-            "-y",
+            self.ffmpeg_path, "-y",
             "-i", str(video_path)
         ]
         
-        # Add each dub segment as input
         for dub_path, _, _ in dub_segments:
             cmd.extend(["-i", str(dub_path)])
         
         cmd.extend([
             "-filter_complex", filter_complex,
-            "-map", "0:v",      # Video from original
-            "-map", "[out]",    # Audio from our mix
-            "-c:v", "copy",     # Copy video (no re-encode)
-            "-c:a", "aac",      # AAC audio codec
-            "-b:a", "192k",     # High quality audio bitrate
+            "-map", "0:v",
+            "-map", "[out]",
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-b:a", "192k",
             str(output_path)
         ])
         
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            logger.info(f"✅ Audio patched successfully: {output_path}")
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            logger.info(f"✅ Audio patched with frequency ducking: {output_path}")
             return output_path
-            
         except subprocess.CalledProcessError as e:
             logger.error(f"Audio patching failed: {e.stderr}")
             raise RuntimeError(f"Failed to patch audio: {e.stderr}")
+
     
     def generate_speech(
         self,

@@ -49,7 +49,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
             violation: f.content,
             action: action,
             reason: `Compliance Risk: ${f.type}`,
-            summary: f.context || 'No additional reasoning provided by Gemini.',
+            summary: f.context || 'No additional reasoning provided.',
             confidence: confidenceMap[f.confidence] || 75,
             iconType
         };
@@ -498,7 +498,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     <div className="space-y-3">
                         <button
                             onClick={() => setShowCustomInput(!showCustomInput)}
-                            className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10 transition-all duration-200"
+                            className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] hover:border-white/10 transition-all duration-200 cursor-pointer"
                         >
                             <span className="text-[10px] font-bold text-muted-foreground/80 uppercase tracking-[0.1em]">Manual Ingestion / Remediation</span>
                             <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground/40 transition-transform duration-300", showCustomInput && "rotate-180")} />
@@ -620,7 +620,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                                         <span className="text-[8px] text-accent/50 font-bold uppercase">{obj.appliedEffect?.replace('replace-', '')}</span>
                                         <button
                                             onClick={() => removeCustomObject(obj.id)}
-                                            className="ml-0.5 p-1 text-muted-foreground/30 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all"
+                                            className="ml-0.5 p-1 text-muted-foreground/30 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all cursor-pointer"
                                         >
                                             <X className="w-3 h-3" />
                                         </button>
@@ -782,7 +782,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     startTime={selectedStep.finding.startTime}
                     endTime={selectedStep.finding.endTime}
                     onActionComplete={(result) => {
-                        onActionComplete?.(result.type, result);
+                        onActionComplete?.(result.type, { ...result, findingId: selectedStep.finding.id });
                         setModalOpen(false);
                     }}
                 />
