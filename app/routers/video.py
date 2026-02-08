@@ -78,7 +78,8 @@ def get_pipeline(settings: Settings = Depends(get_settings)) -> VideoPipeline:
             ffmpeg_path=settings.get_ffmpeg_path(),
             ffprobe_path=settings.get_ffprobe_path(),
             gcs_bucket_name=settings.gcs_bucket_name if settings.gcs_bucket_name else None,
-            gcs_project_id=settings.gcs_project_id
+            gcs_project_id=settings.gcs_project_id,
+            gcs_service_account_email=settings.gcs_service_account_email if settings.gcs_service_account_email else None
         )
     return _pipeline
 
@@ -1406,14 +1407,14 @@ async def blur_object(
                 source_video_for_clip = job.video_path
                 logger.info(f"📹 First effect: extracting clip from original video: {source_video_for_clip}")
             
-            # Step 0: Extract clip from source video (original or previously edited)
+            # Step 0: Extract clip from source video (original or previously edited) - EXACT timestamps
             clip_path = job_dir / f"clip_{request.start_time}_{request.end_time}.mp4"
             pipeline.frame_extractor.extract_clip(
                 video_path=source_video_for_clip,
                 output_path=clip_path,
                 start_time=request.start_time,
                 end_time=request.end_time,
-                buffer_seconds=1.0
+                buffer_seconds=0.0  # Exact extraction, no padding
             )
             
             # Upload clip to GCS for faster SAM3 processing
@@ -1506,14 +1507,14 @@ async def blur_object(
                 logger.info(f"Applying effect to original video: {source_video}")
             
             output_path = job_dir / f"output_{request.effect_type}_{prompt_hash}_stitched.mp4"
-            
+
             video_builder.insert_segment(
                 original_video=source_video,
                 processed_segment=processed_clip_path,
                 output_path=output_path,
                 start_time=request.start_time,
                 end_time=request.end_time,
-                buffer_seconds=1.0
+                buffer_seconds=0.0  # Exact stitching, no padding
             )
             
             # Update job with final output
@@ -1933,14 +1934,14 @@ async def replace_with_runway(
                 actual_end = end_time + half_expand
                 logger.info(f"⚠️ Clip too short ({clip_duration:.2f}s). Expanding to {actual_start:.2f}s - {actual_end:.2f}s ({actual_end - actual_start:.2f}s)")
             
-            # Step 1: Extract clip from video
+            # Step 1: Extract clip from video - EXACT timestamps for precise stitching
             clip_path = job_dir / f"runway_clip_{actual_start}_{actual_end}.mp4"
             pipeline.frame_extractor.extract_clip(
                 video_path=source_video_for_clip,
                 output_path=clip_path,
                 start_time=actual_start,
                 end_time=actual_end,
-                buffer_seconds=0.5  # Small buffer for smooth transitions
+                buffer_seconds=0.0  # Exact extraction, no padding
             )
             
             # Step 2: Upload clip to GCS for Runway
@@ -2171,7 +2172,14 @@ async def censor_audio(
     
     try:
         logger.info(f"Starting audio censoring in '{request.mode}' mode")
-        
+
+        # Determine source video: use output_path if exists (chained effects), otherwise original
+        source_video = job.output_path if (job.output_path and job.output_path.exists()) else job.video_path
+        if source_video == job.output_path:
+            logger.info(f"✨ Chaining audio effect on previous result: {source_video}")
+        else:
+            logger.info(f"Using original video: {source_video}")
+
         # Step 1: Get profanity matches - check request first, then cache, then analyze
         # Priority 1: User-edited matches from frontend (supports manual sync/word fixes)
         if request.profanity_matches:
@@ -2197,7 +2205,7 @@ async def censor_audio(
         else:
             logger.info("Step 1: CACHE MISS - Analyzing audio for profanity with Gemini...")
             profanity_matches = pipeline.audio_analyzer.analyze_profanity(
-                video_path=job.video_path,
+                video_path=job.video_path,  # Always analyze original for consistent timestamps
                 custom_words=request.custom_words
             )
             # Cache the results
@@ -2226,9 +2234,9 @@ async def censor_audio(
             logger.info("Step 2: Applying beep censoring with FFmpeg...")
             processor = AudioBeepProcessor(ffmpeg_path=pipeline.ffmpeg_path)
             output_path = job_dir / "censored_beep.mp4"
-            
+
             processor.apply_beeps(
-                video_path=job.video_path,
+                video_path=source_video,  # Use chained output if available
                 profanity_matches=profanity_matches,
                 output_path=output_path
             )
@@ -2262,7 +2270,7 @@ async def censor_audio(
             
             output_path = job_dir / "censored_cloned.mp4"
             dubber.apply_dubs_with_clone(
-                video_path=job.video_path,
+                video_path=source_video,  # Use chained output if available
                 word_replacements=word_replacements,
                 output_path=output_path,
                 voice_sample_start=request.voice_sample_start,
@@ -2281,7 +2289,7 @@ async def censor_audio(
             
             output_path = job_dir / "censored_auto.mp4"
             dubber.apply_dubs_multi_speaker(
-                video_path=job.video_path,
+                video_path=source_video,  # Use chained output if available
                 output_path=output_path,
                 custom_replacements=request.custom_replacements,
                 profanity_matches=profanity_matches
@@ -2293,13 +2301,25 @@ async def censor_audio(
                 api_key=settings.elevenlabs_api_key,
                 ffmpeg_path=pipeline.ffmpeg_path
             )
-            
+
+            # Debug: Log what we received
+            logger.info(f"DEBUG: Received custom_replacements: {request.custom_replacements}")
+            logger.info(f"DEBUG: Profanity matches before applying custom replacements:")
+            for match in profanity_matches:
+                logger.info(f"  - word='{match.word}', replacement='{match.replacement}'")
+
             # Apply custom replacements to the already-analyzed matches
             if request.custom_replacements:
+                logger.info("DEBUG: Applying custom replacements...")
                 for match in profanity_matches:
                     if match.word in request.custom_replacements:
+                        old_replacement = match.replacement
                         match.replacement = request.custom_replacements[match.word]
-                        logger.info(f"Using custom replacement: '{match.word}' -> '{match.replacement}'")
+                        logger.info(f"✓ Using custom replacement: '{match.word}' -> '{match.replacement}' (was: '{old_replacement}')")
+                    else:
+                        logger.info(f"✗ No custom replacement for word '{match.word}' (keeping: '{match.replacement}')")
+            else:
+                logger.info("DEBUG: No custom_replacements provided, using matches as-is")
             
             # Detect voice type from video (default to female)
             # TODO: Could add gender detection from audio in the future
@@ -2308,7 +2328,7 @@ async def censor_audio(
             # Apply dubs with pre-built voice using DIRECT method (no re-analysis!)
             output_path = job_dir / "censored_dubbed.mp4"
             dubber.apply_dubs_direct(
-                video_path=job.video_path,
+                video_path=source_video,  # Use chained output if available
                 profanity_matches=profanity_matches,
                 output_path=output_path,
                 voice_type=voice_type

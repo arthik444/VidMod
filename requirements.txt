@@ -14,5 +14,6 @@ aiofiles>=23.0.0
 httpx>=0.25.0
 opencv-python-headless>=4.8.0
 google-cloud-storage>=2.14.0
-google-genai
+google-generativeai>=0.3.0
 audio-separator[cpu]>=0.17.0
+google-genai

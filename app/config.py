@@ -81,6 +81,7 @@ class Settings(BaseSettings):
     # Google Cloud Storage Configuration
     gcs_bucket_name: str = ""
     gcs_project_id: str = "vidmod-2025"  # Default project ID, can be overridden by env var
+    gcs_service_account_email: str = ""  # Service account email for signed URL generation
     
     # Server Configuration
     host: str = "0.0.0.0"

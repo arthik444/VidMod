@@ -184,43 +184,62 @@ class FrameExtractor:
         output_path: Path,
         start_time: float,
         end_time: float,
-        buffer_seconds: float = 1.0
+        buffer_seconds: float = 0.0
     ) -> Path:
         """
-        Extract a specific time segment from video (for Smart Clipping optimization).
-        
+        Extract a specific time segment from video with FRAME-ACCURATE precision.
+
+        This method:
+        1. Gets the video's FPS
+        2. Converts timestamps to exact frame numbers
+        3. Uses FFmpeg's trim filter to cut at exact frame boundaries
+        4. Ensures perfect frame alignment with no discontinuities
+
         Args:
             video_path: Path to source video
             output_path: Path to save the extracted clip
-            start_time: Start time in seconds
-            end_time: End time in seconds
-            buffer_seconds: Padding before/after for smooth transitions (default: 1s)
-            
+            start_time: Exact start time in seconds
+            end_time: Exact end time in seconds
+            buffer_seconds: Optional padding in seconds (default: 0.0 for frame-perfect extraction)
+
         Returns:
             Path to the extracted clip
         """
-        # Add buffer and clamp to video bounds
+        # Get video info to determine FPS
         video_info = self.get_video_info(video_path)
+        fps = video_info['fps']
         duration = video_info.get('duration', 0)
-        
-        buffered_start = max(0, start_time - buffer_seconds)
-        buffered_end = min(duration, end_time + buffer_seconds)
-        clip_duration = buffered_end - buffered_start
-        
-        logger.info(f"Extracting clip: {buffered_start:.2f}s to {buffered_end:.2f}s (duration: {clip_duration:.2f}s)")
-        
+
+        # Convert timestamps to exact frame numbers
+        start_frame = int(start_time * fps)
+        end_frame = int(end_time * fps)
+
+        # Apply buffer in frames if specified
+        buffer_frames = int(buffer_seconds * fps)
+        buffered_start_frame = max(0, start_frame - buffer_frames)
+        buffered_end_frame = end_frame + buffer_frames
+
+        # Convert back to precise timestamps for frame boundaries
+        buffered_start = buffered_start_frame / fps
+        buffered_end = min(buffered_end_frame / fps, duration)
+
+        logger.info(f"Frame-accurate extraction: frames {buffered_start_frame}-{buffered_end_frame} ({buffered_start:.3f}s-{buffered_end:.3f}s) at {fps:.3f} fps")
+
+        # Use trim filter for exact frame cutting
+        # trim works with frame numbers for perfect accuracy
         cmd = [
             self.ffmpeg_path, "-y",
-            "-ss", str(buffered_start),
             "-i", str(video_path),
-            "-t", str(clip_duration),
-            "-c", "copy",  # Fast stream copy (no re-encoding)
+            "-vf", f"trim=start_frame={buffered_start_frame}:end_frame={buffered_end_frame},setpts=PTS-STARTPTS",
+            "-af", f"atrim=start={buffered_start:.6f}:end={buffered_end:.6f},asetpts=PTS-STARTPTS",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+            "-c:a", "aac", "-b:a", "192k",
             str(output_path)
         ]
-        
+
         try:
             subprocess.run(cmd, capture_output=True, text=True, check=True)
-            logger.info(f"Clip extracted to {output_path}")
+            logger.info(f"Frame-accurate clip extracted: {output_path}")
             return output_path
         except subprocess.CalledProcessError as e:
             logger.error(f"Clip extraction failed: {e.stderr}")

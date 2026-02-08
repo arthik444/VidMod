@@ -341,41 +341,55 @@ class VideoBuilder:
         input_video: Path,
         output_path: Path,
         target_fps: float,
-        preserve_audio: bool = True
+        preserve_audio: bool = True,
+        target_resolution: tuple = None
     ) -> Path:
         """
-        Re-encode video to match a target frame rate.
+        Re-encode video to match a target frame rate and optionally resolution.
         This is crucial for stitching videos from different sources (e.g., Runway output).
-        
+
         Args:
             input_video: Path to the source video (potentially with different fps)
             output_path: Path to save the normalized video
             target_fps: Target frame rate to match
             preserve_audio: Whether to copy audio stream
-            
+            target_resolution: Optional (width, height) to match original resolution
+
         Returns:
             Path to the normalized video
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         # Get current fps
         current_fps = self.get_video_fps(input_video)
-        
+
         # If fps is already close enough (within 0.5 fps), just copy
-        if abs(current_fps - target_fps) < 0.5:
+        if abs(current_fps - target_fps) < 0.5 and not target_resolution:
             logger.info(f"Video fps {current_fps:.1f} is close to target {target_fps:.1f}, no normalization needed")
             import shutil
             shutil.copy(input_video, output_path)
             return output_path
-        
+
         logger.info(f"Normalizing video fps: {current_fps:.1f} -> {target_fps:.1f}")
-        
-        # Re-encode with target fps
-        # Using -r for output fps and -filter:v fps= for proper frame interpolation
+        if target_resolution:
+            logger.info(f"Normalizing resolution to: {target_resolution[0]}x{target_resolution[1]}")
+
+        # Build filter chain
+        filters = [f"fps={target_fps}"]
+
+        # Add scale filter if target resolution is specified
+        if target_resolution:
+            width, height = target_resolution
+            # Use scale with exact size and maintain aspect ratio with padding if needed
+            filters.append(f"scale={width}:{height}:force_original_aspect_ratio=decrease,pad={width}:{height}:(ow-iw)/2:(oh-ih)/2")
+
+        filter_chain = ",".join(filters)
+
+        # Re-encode with target fps and resolution
         cmd = [
             self.ffmpeg_path, "-y",
             "-i", str(input_video),
-            "-filter:v", f"fps={target_fps}",
+            "-filter:v", filter_chain,
             "-c:v", "libx264",
             "-crf", "18",
             "-preset", "fast",
@@ -405,29 +419,52 @@ class VideoBuilder:
         output_path: Path,
         start_time: float,
         end_time: float,
-        buffer_seconds: float = 1.0
+        buffer_seconds: float = 0.0
     ) -> Path:
         """
-        Replace a segment of the original video with a processed segment.
-        
-        This uses FFmpeg's concat demuxer for seamless stitching.
-        
+        Replace a segment of the original video with a processed segment using FRAME-ACCURATE stitching.
+
+        This method:
+        1. Gets the video's FPS
+        2. Converts timestamps to exact frame numbers
+        3. Extracts segments at exact frame boundaries
+        4. Stitches them together perfectly with no discontinuities
+
         Args:
             original_video: Path to the original full video
             processed_segment: Path to the processed clip
             output_path: Path to save the final video
-            start_time: Original start time of the incident
-            end_time: Original end time of the incident
-            buffer_seconds: Buffer used during extraction
-            
+            start_time: Exact start time of the segment (seconds)
+            end_time: Exact end time of the segment (seconds)
+            buffer_seconds: Optional buffer (default: 0.0 for frame-perfect stitching)
+
         Returns:
             Path to the stitched video
         """
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Calculate actual clip boundaries (with buffer)
-        buffered_start = max(0, start_time - buffer_seconds)
-        buffered_end = end_time + buffer_seconds
+
+        # Get video info to determine FPS
+        from core.frame_extractor import FrameExtractor
+        extractor = FrameExtractor(ffmpeg_path=self.ffmpeg_path)
+        video_info = extractor.get_video_info(original_video)
+        fps = video_info['fps']
+
+        logger.info(f"Frame-accurate stitching at {fps:.3f} fps")
+
+        # Convert timestamps to exact frame numbers
+        start_frame = int(start_time * fps)
+        end_frame = int(end_time * fps)
+
+        # Apply buffer in frames if specified
+        buffer_frames = int(buffer_seconds * fps)
+        buffered_start_frame = max(0, start_frame - buffer_frames)
+        buffered_end_frame = end_frame + buffer_frames
+
+        # Convert back to exact timestamps for frame boundaries
+        buffered_start = buffered_start_frame / fps
+        buffered_end = buffered_end_frame / fps
+
+        logger.info(f"Frame range: {buffered_start_frame} to {buffered_end_frame} (time: {buffered_start:.3f}s to {buffered_end:.3f}s)")
         
         # Create temporary clips: before, processed, after
         temp_dir = output_path.parent / "temp_segments"
@@ -438,36 +475,55 @@ class VideoBuilder:
         concat_list = temp_dir / "concat_list.txt"
         
         try:
-            # Extract "before" segment (0 to buffered_start)
-            if buffered_start > 0:
+            # Extract "before" segment using frame-accurate trim filter
+            if buffered_start_frame > 0:
+                # Use trim filter for exact frame cutting
                 cmd_before = [
                     self.ffmpeg_path, "-y",
                     "-i", str(original_video),
-                    "-t", str(buffered_start),
-                    "-c", "copy",
+                    "-vf", f"trim=end_frame={buffered_start_frame},setpts=PTS-STARTPTS",
+                    "-af", f"atrim=end={buffered_start:.6f},asetpts=PTS-STARTPTS",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+                    "-c:a", "aac", "-b:a", "192k",
                     str(before_clip)
                 ]
                 subprocess.run(cmd_before, capture_output=True, text=True, check=True)
-                logger.info(f"Extracted 'before' segment: 0s to {buffered_start:.2f}s")
+                logger.info(f"Extracted 'before' segment: frame 0 to {buffered_start_frame} ({buffered_start:.3f}s)")
+
+            # Extract "after" segment using frame-accurate trim filter
+            # Get total frame count
+            total_frames = video_info.get('total_frames', int(video_info['duration'] * fps))
+
+            if buffered_end_frame < total_frames:
+                cmd_after = [
+                    self.ffmpeg_path, "-y",
+                    "-i", str(original_video),
+                    "-vf", f"trim=start_frame={buffered_end_frame},setpts=PTS-STARTPTS",
+                    "-af", f"atrim=start={buffered_end:.6f},asetpts=PTS-STARTPTS",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
+                    "-c:a", "aac", "-b:a", "192k",
+                    str(after_clip)
+                ]
+                result = subprocess.run(cmd_after, capture_output=True, text=True, check=False)
+                has_after = after_clip.exists() and after_clip.stat().st_size > 1000
+                if has_after:
+                    logger.info(f"Extracted 'after' segment: frame {buffered_end_frame} to end ({buffered_end:.3f}s to end)")
+            else:
+                has_after = False
             
-            # Extract "after" segment (buffered_end to end)
-            cmd_after = [
-                self.ffmpeg_path, "-y",
-                "-ss", str(buffered_end),
-                "-i", str(original_video),
-                "-c", "copy",
-                str(after_clip)
-            ]
-            result = subprocess.run(cmd_after, capture_output=True, text=True, check=False)
-            has_after = after_clip.exists() and after_clip.stat().st_size > 1000
-            if has_after:
-                logger.info(f"Extracted 'after' segment: {buffered_end:.2f}s to end")
-            
-            # CRITICAL: Normalize processed segment fps to match original video
+            # CRITICAL: Normalize processed segment fps AND resolution to match original video
             # This fixes the speed mismatch when Runway outputs different fps
+            # AND fixes zoom issues when Runway outputs different resolution
             original_fps = self.get_video_fps(original_video)
+            original_resolution = (video_info['width'], video_info['height'])
             normalized_segment = temp_dir / "processed_normalized.mp4"
-            self.normalize_video_fps(processed_segment, normalized_segment, original_fps, preserve_audio=True)
+            self.normalize_video_fps(
+                processed_segment,
+                normalized_segment,
+                original_fps,
+                preserve_audio=True,
+                target_resolution=original_resolution
+            )
             
             # Create concat list (using normalized segment)
             with open(concat_list, 'w') as f:

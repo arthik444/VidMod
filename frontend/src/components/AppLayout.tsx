@@ -276,12 +276,27 @@ const AppLayout: React.FC = () => {
             setShowOriginal(false);  // Show edited by default after processing
             setSelectedVersion(null);  // Show latest version
 
+            // Find the corresponding finding to get category info
+            let objectName = 'Object';
+            if (result.findingId !== undefined) {
+                const finding = findings.find(f => f.id === result.findingId);
+                if (finding) {
+                    // Format as "Category - ActionType" (e.g., "Alcohol - BLOCK_SEGMENT")
+                    const category = finding.category.charAt(0).toUpperCase() + finding.category.slice(1);
+                    objectName = `${category} - ${actionType}`;
+                } else {
+                    objectName = result.objectName || result.text_prompt || actionType;
+                }
+            } else {
+                objectName = result.objectName || result.text_prompt || actionType;
+            }
+
             // Add to edit history with correct version number
             setEditHistory(prev => {
                 const newVersion: EditVersion = {
                     id: `edit-${Date.now()}`,
                     version: prev.length + 1,  // Use prev.length for correct numbering
-                    objectName: result.objectName || result.text_prompt || 'Object',
+                    objectName: objectName,
                     effectType: actionType,
                     downloadUrl: processedUrl,
                     enabled: true,
