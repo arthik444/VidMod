@@ -172,10 +172,11 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                 endTime: f.endTime,
                 intensity: 30, // Default intensity
                 beepWords: isAudioFinding ? [f.content.trim().toLowerCase()] : [],
-                profanityMatches: (defaultEffect as string) === 'censor-dub' ? [{
+                // Create profanityMatches for ALL audio findings (beep or dub)
+                profanityMatches: isAudioFinding ? [{
                     word: f.content,
-                    start_time: f.startTime,
-                    end_time: f.endTime,
+                    start_time: f.startTime || 0,
+                    end_time: f.endTime || 0,
                     replacement: ''
                 }] : []
             };
@@ -262,15 +263,34 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     // Audio censoring for profanity
                     const { censorAudio, getDownloadUrl } = await import('../services/api');
 
-                    const mode = config.effectType === 'censor-beep' ? 'beep' : 'dub';
+                    // Use 'auto' mode for dubbing (multi-speaker voice cloning)
+                    // Use 'beep' mode for beeping
+                    const mode = config.effectType === 'censor-beep' ? 'beep' : 'auto';
+
+                    // For dub mode: sync replacementPrompt to profanityMatches
+                    if (config.effectType === 'censor-dub' && config.profanityMatches && config.replacementPrompt) {
+                        // Update the replacement field in profanityMatches with the UI value
+                        config.profanityMatches = config.profanityMatches.map(match => ({
+                            ...match,
+                            replacement: config.replacementPrompt // Sync from UI input
+                        }));
+                    }
+
+                    // Build custom replacements from profanity matches (same as individual dub flow)
+                    const customReplacements = config.profanityMatches?.reduce((acc, match) => {
+                        if (match.replacement) {
+                            acc[match.word] = match.replacement;
+                        }
+                        return acc;
+                    }, {} as Record<string, string>);
 
                     const result = await censorAudio(
                         jobId,
-                        mode,
-                        undefined, // voiceSampleStart
-                        undefined, // voiceSampleEnd
+                        mode, // Now using 'auto' for voice cloning!
+                        undefined, // voiceSampleStart (not needed for auto mode)
+                        undefined, // voiceSampleEnd (not needed for auto mode)
                         config.beepWords,
-                        undefined, // customReplacements
+                        customReplacements, // Pass custom replacements built from matches
                         config.effectType === 'censor-dub' ? config.profanityMatches : undefined
                     );
 
@@ -428,8 +448,8 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
             );
         }
 
-        // Blur/Mask action - always available
-        if (step.iconType === 'blur' || step.iconType === 'alert' || step.iconType === 'cut') {
+        // Visual effects - for non-audio findings (blur, pixelate, replace)
+        if (step.iconType !== 'mute' && step.finding.category !== 'language') {
             buttons.push(
                 <button
                     key="blur"
@@ -452,21 +472,6 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     Pixelate
                 </button>
             );
-            buttons.push(
-                <button
-                    key="replace-runway"
-                    onClick={(e) => handleApplyAction(step, 'replace-runway', e)}
-                    disabled={!jobId}
-                    className="flex items-center gap-1 px-2 py-1 bg-secondary/20 hover:bg-secondary/30 border border-border rounded text-[9px] font-bold uppercase transition-colors disabled:opacity-50"
-                >
-                    <RefreshCw className="w-3 h-3" />
-                    Replace
-                </button>
-            );
-        }
-
-        // Replace action - for replace or logo findings
-        if (step.iconType === 'replace' || step.finding.category === 'logo') {
             buttons.push(
                 <button
                     key="replace-runway"

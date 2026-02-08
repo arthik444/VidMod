@@ -93,7 +93,8 @@ class VideoPipeline:
         ffmpeg_path: str = "ffmpeg",
         ffprobe_path: str = "ffprobe",
         gcs_bucket_name: Optional[str] = None,
-        gcs_project_id: Optional[str] = None
+        gcs_project_id: Optional[str] = None,
+        gcs_service_account_email: Optional[str] = None
     ):
         self.ffmpeg_path = ffmpeg_path  # Store for blur/pixelate effects
         self.ffprobe_path = ffprobe_path
@@ -123,7 +124,8 @@ class VideoPipeline:
             try:
                 self.gcs_uploader = GCSUploader(
                     bucket_name=gcs_bucket_name,
-                    project_id=gcs_project_id
+                    project_id=gcs_project_id,
+                    service_account_email=gcs_service_account_email
                 )
                 logger.info(f"GCS integration enabled for bucket: {gcs_bucket_name}")
             except Exception as e:

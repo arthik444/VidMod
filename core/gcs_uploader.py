@@ -31,16 +31,18 @@ class GCSUploader:
         videos = uploader.list_videos()
     """
     
-    def __init__(self, bucket_name: str, project_id: Optional[str] = None):
+    def __init__(self, bucket_name: str, project_id: Optional[str] = None, service_account_email: Optional[str] = None):
         """
         Initialize GCS uploader.
-        
+
         Args:
             bucket_name: GCS bucket name
             project_id: Optional Google Cloud Project ID
+            service_account_email: Optional service account email for signed URL generation
         """
         self.bucket_name = bucket_name
         self.project_id = project_id
+        self.service_account_email = service_account_email
         
         # Initialize GCS client (uses Google Application Credentials implicitly)
         try:
@@ -140,18 +142,33 @@ class GCSUploader:
                     creds, _ = default()
                     
                     # Determine Service Account Email
-                    # 1. Try from credentials
-                    service_account_email = getattr(creds, "service_account_email", None)
-                    
-                    # 2. Try generic compute default if not found
-                    if not service_account_email or service_account_email == "default":
-                        # This is a safe fallback for the default compute SA
-                        # But better to check env if set
-                        service_account_email = os.getenv("GCS_SERVICE_ACCOUNT_EMAIL")
-                        
+                    # 1. Use the email provided during initialization
+                    service_account_email = self.service_account_email
+
+                    # 2. Try from credentials if not set
                     if not service_account_email:
-                        logger.warning("Could not determine service account email for IAM signing. Using 'default'.")
-                        service_account_email = "default" 
+                        service_account_email = getattr(creds, "service_account_email", None)
+
+                    # 3. Try environment variable if still not found
+                    if not service_account_email or service_account_email == "default":
+                        service_account_email = os.getenv("GCS_SERVICE_ACCOUNT_EMAIL")
+
+                    # 4. Try to get from metadata server (works on Cloud Run/GCE)
+                    if not service_account_email:
+                        try:
+                            import requests
+                            metadata_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email"
+                            headers = {"Metadata-Flavor": "Google"}
+                            response = requests.get(metadata_url, headers=headers, timeout=1)
+                            if response.status_code == 200:
+                                service_account_email = response.text
+                                logger.info(f"Retrieved service account from metadata: {service_account_email}")
+                        except:
+                            pass
+
+                    if not service_account_email:
+                        logger.error("Could not determine service account email for IAM signing.")
+                        raise ValueError("Cannot generate signed URL: No service account available. Please set GOOGLE_APPLICATION_CREDENTIALS to a service account key file or set GCS_SERVICE_ACCOUNT_EMAIL environment variable.") 
 
                     logger.info(f"Using IAM signing with account: {service_account_email}")
 

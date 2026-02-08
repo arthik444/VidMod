@@ -57,36 +57,103 @@ class ElevenLabsDubber:
         # Track cloned voices for cleanup
         self._cloned_voice_ids = []
     
+    def extend_audio_sample(self, input_path: Path, output_path: Path, target_duration: float = 10.0) -> Path:
+        """
+        Extend audio sample to meet minimum duration by looping/repeating it.
+        This ensures ElevenLabs gets the recommended 10+ seconds for quality voice cloning.
+
+        Args:
+            input_path: Path to original audio sample
+            output_path: Path to save extended audio
+            target_duration: Target duration in seconds (default: 10s)
+
+        Returns:
+            Path to extended audio file
+        """
+        # Get current duration
+        current_duration = self.get_audio_duration(input_path)
+
+        if current_duration >= target_duration:
+            # Already long enough
+            import shutil
+            shutil.copy(input_path, output_path)
+            return output_path
+
+        # Calculate how many times to loop
+        loops_needed = int(target_duration / current_duration) + 1
+
+        logger.info(f"🔄 Extending audio from {current_duration:.1f}s to {target_duration:.1f}s by looping {loops_needed}x for better voice cloning quality")
+
+        # Create concat file listing the audio multiple times
+        concat_file = input_path.parent / f"concat_{input_path.stem}.txt"
+        with open(concat_file, 'w') as f:
+            for _ in range(loops_needed):
+                f.write(f"file '{input_path.absolute()}'\n")
+
+        # Concatenate and trim to exact target duration
+        cmd = [
+            self.ffmpeg_path, "-y",
+            "-f", "concat",
+            "-safe", "0",
+            "-i", str(concat_file),
+            "-t", str(target_duration),  # Trim to exact duration
+            "-acodec", "libmp3lame",
+            "-ar", "44100",
+            "-ac", "1",
+            "-b:a", "192k",
+            str(output_path)
+        ]
+
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+
+            # Verify extended duration
+            final_duration = self.get_audio_duration(output_path)
+            logger.info(f"✅ Audio extended to {final_duration:.1f}s (target: {target_duration:.1f}s) - ready for high-quality voice cloning!")
+
+            # Clean up concat file
+            if concat_file.exists():
+                concat_file.unlink()
+
+            return output_path
+        except subprocess.CalledProcessError as e:
+            logger.error(f"Audio extension failed: {e.stderr}")
+            raise RuntimeError(f"Failed to extend audio: {e.stderr}")
+
     def extract_audio_sample(
         self,
         video_path: Path,
         start_time: float,
         end_time: float,
-        output_path: Optional[Path] = None
+        output_path: Optional[Path] = None,
+        ensure_min_duration: bool = True,
+        min_duration: float = 10.0
     ) -> Path:
         """
         Extract audio sample from video for voice cloning.
-        
-        Requires at least 10 seconds of clean speech (no background music/effects).
-        
+        Automatically extends short samples by looping to meet ElevenLabs 10s recommendation.
+
         Args:
             video_path: Path to source video
             start_time: Start of clean speech sample (seconds)
             end_time: End of clean speech sample (seconds)
             output_path: Where to save the audio sample (optional)
-            
+            ensure_min_duration: Whether to extend sample if < min_duration (default: True)
+            min_duration: Minimum duration in seconds (default: 10s)
+
         Returns:
-            Path to extracted audio file (MP3)
+            Path to extracted audio file (MP3) - extended if needed
         """
         if not output_path:
             output_path = video_path.parent / f"voice_sample_{start_time}_{end_time}.mp3"
-        
+
         duration = end_time - start_time
-        if duration < 10:
-            logger.warning(f"Voice sample is only {duration:.1f}s. ElevenLabs recommends at least 10 seconds for best results.")
-        
+
         logger.info(f"Extracting voice sample: {start_time}s to {end_time}s ({duration:.1f}s)")
-        
+
+        # Extract the base sample
+        temp_output = output_path.parent / f"temp_{output_path.name}" if ensure_min_duration and duration < min_duration else output_path
+
         cmd = [
             self.ffmpeg_path,
             "-y",
@@ -98,12 +165,21 @@ class ElevenLabsDubber:
             "-ar", "44100",  # Sample rate
             "-ac", "1",  # Mono (better for voice cloning)
             "-b:a", "192k",  # High quality
-            str(output_path)
+            str(temp_output)
         ]
-        
+
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
-            logger.info(f"Voice sample extracted: {output_path}")
+            logger.info(f"Voice sample extracted: {temp_output}")
+
+            # Extend if needed
+            if ensure_min_duration and duration < min_duration:
+                logger.warning(f"Voice sample is only {duration:.1f}s. Extending to {min_duration:.1f}s for optimal ElevenLabs quality...")
+                self.extend_audio_sample(temp_output, output_path, target_duration=min_duration)
+                # Clean up temp file
+                if temp_output.exists():
+                    temp_output.unlink()
+
             return output_path
         except subprocess.CalledProcessError as e:
             logger.error(f"Failed to extract audio sample: {e.stderr}")
@@ -833,13 +909,23 @@ class ElevenLabsDubber:
             return output_path
         
         logger.info(f"Dubbing {len(profanity_matches)} matches with {voice_type} voice (direct mode - no re-analysis)")
-        
+
+        # Debug: Log profanity matches received
+        logger.info("DEBUG: Profanity matches received in apply_dubs_direct:")
+        for i, match in enumerate(profanity_matches):
+            logger.info(f"  Match {i}: word='{match.word}', replacement='{match.replacement}', time={match.start_time:.2f}-{match.end_time:.2f}s")
+
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_path = Path(temp_dir)
-                
+
                 # Step 1: Cluster matches into phrases
                 clusters = self.cluster_matches(profanity_matches)
+
+                # Debug: Log clusters generated
+                logger.info(f"DEBUG: Generated {len(clusters)} clusters:")
+                for i, c in enumerate(clusters):
+                    logger.info(f"  Cluster {i}: phrase='{c['phrase']}', time={c['start_time']:.2f}-{c['end_time']:.2f}s")
                 
                 dub_segments = []
                 for i, c in enumerate(clusters):

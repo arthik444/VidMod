@@ -51,8 +51,8 @@ const ActionModal: React.FC<ActionModalProps> = ({
     onActionComplete,
     initialBox,
     timestamp,
-    startTime,
-    endTime
+    startTime: initialStartTime,
+    endTime: initialEndTime
 }) => {
     const [status, setStatus] = useState<Status>('idle');
     const [error, setError] = useState<string>('');
@@ -84,6 +84,10 @@ const ActionModal: React.FC<ActionModalProps> = ({
     const [voiceSampleEnd, setVoiceSampleEnd] = useState<number>(10);
     const [intensity, setIntensity] = useState<number>(30);
 
+    // Editable timestamps for Smart Clipping
+    const [startTime, setStartTime] = useState<number>(initialStartTime || 0);
+    const [endTime, setEndTime] = useState<number>(initialEndTime || 0);
+
     // Track if already loading to prevent duplicate calls (React StrictMode protection)
     const isLoadingRef = useRef(false);
 
@@ -100,6 +104,8 @@ const ActionModal: React.FC<ActionModalProps> = ({
             setGeneratedImagePath('');
             setIsGeneratingImage(false);
             setImagePrompt('');
+            setStartTime(initialStartTime || 0);
+            setEndTime(initialEndTime || 0);
             isLoadingRef.current = false; // Reset the ref
 
             // Auto-load profanity for censor modes (with guard)
@@ -108,14 +114,36 @@ const ActionModal: React.FC<ActionModalProps> = ({
                 loadProfanityAndSuggestions();
             }
         }
-    }, [isOpen, initialPrompt, actionType]);
+    }, [isOpen, initialPrompt, actionType, initialStartTime, initialEndTime]);
 
     // Load profanity detection and suggestions
     const loadProfanityAndSuggestions = async () => {
         setLoadingSuggestions(true);
         try {
-            // Step 1: Analyze audio for profanity
-            const audioResult = await analyzeAudio(jobId);
+            // Check if we already have profanity data from the finding (from initial detection)
+            const hasPreExistingData = initialPrompt && initialStartTime !== undefined && initialEndTime !== undefined;
+
+            let audioResult;
+
+            if (hasPreExistingData && (actionType === 'censor-beep' || actionType === 'censor-dub')) {
+                // ✅ Use pre-existing data from finding (NO re-analysis! - same as batch mode)
+                console.log('✅ CACHE HIT: Using pre-analyzed profanity data from finding (no re-analysis)');
+                audioResult = {
+                    profanity_count: 1,
+                    matches: [{
+                        word: initialPrompt,
+                        start_time: initialStartTime,
+                        end_time: initialEndTime,
+                        replacement: '',
+                        confidence: 'high',
+                        context: ''
+                    }]
+                };
+            } else {
+                // ❌ No pre-existing data, analyze audio (for global dubbing case)
+                console.log('⚠️ CACHE MISS: No pre-existing data, analyzing audio...');
+                audioResult = await analyzeAudio(jobId);
+            }
 
             if (audioResult.profanity_count === 0) {
                 setLoadingSuggestions(false);
@@ -466,6 +494,47 @@ const ActionModal: React.FC<ActionModalProps> = ({
                         </div>
                     )}
 
+                    {/* Editable Timestamps for ALL action types */}
+                    {(actionType === 'blur' || actionType === 'pixelate' || actionType === 'mask') && (
+                        <div className="surface-2 border border-border rounded-xl overflow-hidden">
+                            <div className="p-3 bg-white/3 border-b border-border flex items-center justify-between">
+                                <span className="label-sm !text-zinc-300">Smart Clipping</span>
+                                <div className="badge badge-success !text-[10px]">
+                                    {startTime > 0 || endTime > 0 ? 'Active' : 'Full Video'}
+                                </div>
+                            </div>
+                            <div className="p-4 space-y-3">
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1 space-y-1.5">
+                                        <label className="label-sm !text-[9px] !text-zinc-500">Start Time (s)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={startTime}
+                                            onChange={(e) => setStartTime(parseFloat(e.target.value) || 0)}
+                                            className="w-full bg-zinc-900 border border-border rounded-lg px-3 py-2 text-sm mono text-zinc-200 focus:outline-none focus:border-primary/50"
+                                            placeholder="0.0"
+                                        />
+                                    </div>
+                                    <div className="flex-1 space-y-1.5">
+                                        <label className="label-sm !text-[9px] !text-zinc-500">End Time (s)</label>
+                                        <input
+                                            type="number"
+                                            step="0.1"
+                                            value={endTime}
+                                            onChange={(e) => setEndTime(parseFloat(e.target.value) || 0)}
+                                            className="w-full bg-zinc-900 border border-border rounded-lg px-3 py-2 text-sm mono text-zinc-200 focus:outline-none focus:border-primary/50"
+                                            placeholder="0.0"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="p-3 bg-white/3 text-[10px] text-zinc-500 text-center border-t border-border">
+                                {startTime > 0 || endTime > 0 ? 'Precision temporal processing enabled' : 'Leave both at 0 to process entire video'}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Replacement Specific Fields */}
                     {actionType.includes('replace') && (
                         <div className="space-y-4">
@@ -480,26 +549,43 @@ const ActionModal: React.FC<ActionModalProps> = ({
                                 />
                             </div>
 
-                            {/* Gen-AI Process Info */}
-                            {actionType === 'replace-runway' && startTime !== undefined && endTime !== undefined && (
+                            {/* Editable Timestamps for Replace-Runway */}
+                            {actionType === 'replace-runway' && (
                                 <div className="surface-2 border border-border rounded-xl overflow-hidden">
                                     <div className="p-3 bg-white/3 border-b border-border flex items-center justify-between">
                                         <span className="label-sm !text-zinc-300">Smart Clipping</span>
-                                        <div className="badge badge-success !text-[10px]">Active</div>
-                                    </div>
-                                    <div className="p-4 flex items-center justify-around gap-4 text-center">
-                                        <div className="space-y-1 flex-1">
-                                            <span className="label-sm !text-[9px] !text-zinc-500 block">Start</span>
-                                            <span className="mono text-sm text-zinc-200">{startTime.toFixed(2)}s</span>
+                                        <div className="badge badge-success !text-[10px]">
+                                            {startTime > 0 || endTime > 0 ? 'Active' : 'Full Video'}
                                         </div>
-                                        <div className="divider-v !h-8 opacity-50" />
-                                        <div className="space-y-1 flex-1">
-                                            <span className="label-sm !text-[9px] !text-zinc-500 block">End</span>
-                                            <span className="mono text-sm text-zinc-200">{endTime.toFixed(2)}s</span>
+                                    </div>
+                                    <div className="p-4 space-y-3">
+                                        <div className="flex items-center gap-4">
+                                            <div className="flex-1 space-y-1.5">
+                                                <label className="label-sm !text-[9px] !text-zinc-500">Start Time (s)</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={startTime}
+                                                    onChange={(e) => setStartTime(parseFloat(e.target.value) || 0)}
+                                                    className="w-full bg-zinc-900 border border-border rounded-lg px-3 py-2 text-sm mono text-zinc-200 focus:outline-none focus:border-primary/50"
+                                                    placeholder="0.0"
+                                                />
+                                            </div>
+                                            <div className="flex-1 space-y-1.5">
+                                                <label className="label-sm !text-[9px] !text-zinc-500">End Time (s)</label>
+                                                <input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={endTime}
+                                                    onChange={(e) => setEndTime(parseFloat(e.target.value) || 0)}
+                                                    className="w-full bg-zinc-900 border border-border rounded-lg px-3 py-2 text-sm mono text-zinc-200 focus:outline-none focus:border-primary/50"
+                                                    placeholder="0.0"
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="p-3 bg-white/3 text-[10px] text-zinc-500 text-center border-t border-border">
-                                        Precision temporal processing enabled
+                                        {startTime > 0 || endTime > 0 ? 'Precision temporal processing enabled' : 'Leave both at 0 to process entire video'}
                                     </div>
                                 </div>
                             )}
@@ -947,7 +1033,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                     {status !== 'completed' && (
                         <button
                             onClick={handleExecute}
-                            disabled={status === 'processing' || status === 'detecting' || (actionType === 'replace-runway' && !referenceImage)}
+                            disabled={status === 'processing' || status === 'detecting'}
                             className="btn-primary text-xs sm:text-sm"
                         >
                             {status === 'processing' ? (
