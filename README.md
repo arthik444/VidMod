@@ -20,7 +20,7 @@
 
 ---
 
-## 🌟 The Vision: Entering the Action Era
+## The Vision: Entering the Action Era
 
 We built **VidMod** to answer a single question: *What happens when you give an AI model the ability to not just watch a video, but to edit it?*
 
