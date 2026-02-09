@@ -30,7 +30,7 @@ In the world of media, compliance is a bottleneck. Every minute of content uploa
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 VidMod operates on a cloud-native, event-driven architecture designed for high-throughput video processing.
 
@@ -59,7 +59,7 @@ graph TD
 
 ---
 
-## 🧠 Why Gemini 3? The Brain Behind the Operation
+## Why Gemini 3? The Brain Behind the Operation
 
 VidMod is not a wrapper. It is a system architected around Gemini 3's unique capabilities. This project would have been impossible with previous generation models.
 
@@ -79,7 +79,7 @@ We don't hard-code rules. We inject complex, real-world policy documents (e.g., 
 
 ---
 
-## ⚙️ Extensive Engineering: The "Gemini Loop"
+## Extensive Engineering: The "Gemini Loop"
 
 We built a robust, event-driven architecture to turn Gemini's reasoning into reality. The system supports five distinct remediation actions, each powered by a specialized engineering pipeline.
 
@@ -123,7 +123,7 @@ VidMod is designed for long-running, complex tasks.
 
 ---
 
-## 🔮 The Future: Autonomous Media with Gemini Veo
+## The Future: Autonomous Media with Gemini Veo
 
 VidMod proves that Gemini 3 is more than a chatbot—it's an infrastructure layer for the next generation of media tools. We are moving from a world where humans edit content to a world where *humans direct agents to edit content for them*.
 
@@ -132,7 +132,7 @@ While we currently orchestrate external video models, the future of VidMod lies 
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -145,7 +145,7 @@ While we currently orchestrate external video models, the future of VidMod lies 
 
 ---
 
-## 🚀 Deployment Guide
+## Deployment Guide
 
 VidMod is cloud-native and ready for production.
 
@@ -176,7 +176,7 @@ firebase deploy --only hosting
 
 ---
 
-## ⚡ Quick Start (Local)
+## Quick Start (Local)
 
 ### Prerequisites
 *   **Python 3.10+**
@@ -234,7 +234,7 @@ VidMod/
 
 ---
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Errors
 
@@ -251,7 +251,7 @@ VidMod/
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 VidMod is open for contributions.
 1.  Fork the Project
