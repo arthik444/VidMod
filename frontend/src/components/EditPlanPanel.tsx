@@ -28,9 +28,19 @@ interface EditPlanPanelProps {
     findings?: Finding[];
     jobId?: string;  // Job ID for API calls
     onActionComplete?: (actionType: string, result: any) => void;
+    isProcessingBatch?: boolean;
+    batchProgress?: string;
+    onBatchStateChange?: (processing: boolean, progress: string) => void;
 }
 
-const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onActionComplete }) => {
+const EditPlanPanel: React.FC<EditPlanPanelProps> = ({
+    findings = [],
+    jobId,
+    onActionComplete,
+    isProcessingBatch: isProcessingBatchProp,
+    batchProgress: batchProgressProp,
+    onBatchStateChange
+}) => {
     // Map findings to steps
     const steps: EditStep[] = findings.map(f => {
         const confidenceMap: Record<string, number> = { 'High': 95, 'Medium': 80, 'Low': 60 };
@@ -126,9 +136,22 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
         setCustomObjects(prev => prev.filter(obj => obj.id !== id));
     };
 
-    // State for batch processing
-    const [isProcessingBatch, setIsProcessingBatch] = useState(false);
-    const [batchProgress, setBatchProgress] = useState('');
+    // State for batch processing (use props if provided, otherwise local state for backward compatibility)
+    const [localIsProcessingBatch, setLocalIsProcessingBatch] = useState(false);
+    const [localBatchProgress, setLocalBatchProgress] = useState('');
+
+    const isProcessingBatch = isProcessingBatchProp ?? localIsProcessingBatch;
+    const batchProgress = batchProgressProp ?? localBatchProgress;
+
+    // Helper to update both processing state and progress at once
+    const setBatchState = (processing: boolean, progress: string) => {
+        if (onBatchStateChange) {
+            onBatchStateChange(processing, progress);
+        } else {
+            setLocalIsProcessingBatch(processing);
+            setLocalBatchProgress(progress);
+        }
+    };
 
     // State for batch review modal
     const [showBatchReviewModal, setShowBatchReviewModal] = useState(false);
@@ -207,8 +230,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
         }
 
         setShowBatchReviewModal(false);
-        setIsProcessingBatch(true);
-        setBatchProgress(`Starting batch process for ${selected.length} findings...`);
+        setBatchState(true, `Starting batch process for ${selected.length} findings...`);
 
         try {
             let lastDownloadUrl = '';
@@ -217,7 +239,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                 const config = selected[i];
                 const shortPrompt = config.prompt.substring(0, 60) + (config.prompt.length > 60 ? '...' : '');
 
-                setBatchProgress(`Processing ${i + 1}/${selected.length}: ${shortPrompt}`);
+                setBatchState(true, `Processing ${i + 1}/${selected.length}: ${shortPrompt}`);
 
                 if (config.effectType === 'blur' || config.effectType === 'pixelate') {
                     // Import blurObject from api
@@ -238,7 +260,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                 } else if (config.effectType === 'replace-runway') {
                     // Runway: text-only replacement with Smart Clipping
                     if (!config.replacementPrompt.trim()) {
-                        setBatchProgress(`Skipped "${config.prompt}" - no replacement prompt provided`);
+                        setBatchState(true, `Skipped "${config.prompt}" - no replacement prompt provided`);
                         await new Promise(resolve => setTimeout(resolve, 1000));
                         continue;
                     }
@@ -267,12 +289,14 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     // Use 'beep' mode for beeping
                     const mode = config.effectType === 'censor-beep' ? 'beep' : 'auto';
 
-                    // For dub mode: sync replacementPrompt to profanityMatches
+                    // For dub mode: sync replacementPrompt AND timestamps to profanityMatches
                     if (config.effectType === 'censor-dub' && config.profanityMatches && config.replacementPrompt) {
-                        // Update the replacement field in profanityMatches with the UI value
+                        // Update the replacement field AND timestamps in profanityMatches with the UI values
                         config.profanityMatches = config.profanityMatches.map(match => ({
                             ...match,
-                            replacement: config.replacementPrompt // Sync from UI input
+                            replacement: config.replacementPrompt, // Sync from UI input
+                            start_time: config.startTime,  // ✅ Sync edited start timestamp
+                            end_time: config.endTime        // ✅ Sync edited end timestamp
                         }));
                     }
 
@@ -302,22 +326,22 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                 }
             }
 
-            setBatchProgress(`Successfully processed ${selected.length} findings!`);
+            setBatchState(true, `Successfully processed ${selected.length} findings!`);
 
             // Pass the final video URL to the parent to reload the player
             if (onActionComplete) {
                 onActionComplete('batch-findings', {
                     count: selected.length,
-                    downloadUrl: lastDownloadUrl
+                    downloadUrl: lastDownloadUrl,
+                    findingIds: selected.map(c => c.finding.id)
                 });
             }
 
         } catch (error: any) {
-            setBatchProgress(`Error: ${error.message}`);
+            setBatchState(true, `Error: ${error.message}`);
         } finally {
             setTimeout(() => {
-                setIsProcessingBatch(false);
-                setBatchProgress('');
+                setBatchState(false, '');
             }, 3000);
         }
     };
@@ -327,7 +351,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
     const handleApplyAll = async () => {
         if (customObjects.length === 0 || !jobId) return;
 
-        setIsProcessingBatch(true);
+        setBatchState(true, `Starting batch process for ${customObjects.length} objects...`);
 
         try {
             console.log('Processing objects with timeline grouping:', customObjects);
@@ -365,7 +389,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                 const effectType = group[0].effectType;
                 const objectNames = group.map(obj => obj.name);
 
-                setBatchProgress(`Processing ${processedCount + 1}-${processedCount + group.length}/${customObjects.length}: ${objectNames.join(', ')}`);
+                setBatchState(true, `Processing ${processedCount + 1}-${processedCount + group.length}/${customObjects.length}: ${objectNames.join(', ')}`);
 
                 // Route to appropriate API based on effect type
                 if (effectType === 'blur' || effectType === 'pixelate') {
@@ -393,7 +417,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                 } else if (effectType === 'replace-runway') {
                     // Replacement: Need reference image (skip if not available)
                     console.warn(`Skipping ${effectType} for ${objectNames.join(', ')} - reference image required`);
-                    setBatchProgress(`Skipped ${objectNames.join(', ')} (${effectType} requires reference image)`);
+                    setBatchState(true, `Skipped ${objectNames.join(', ')} (${effectType} requires reference image)`);
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
@@ -411,10 +435,9 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
 
         } catch (error) {
             console.error('Batch processing error:', error);
-            setBatchProgress(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            setBatchState(true, `Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         } finally {
-            setIsProcessingBatch(false);
-            setTimeout(() => setBatchProgress(''), 3000);
+            setTimeout(() => setBatchState(false, ''), 3000);
         }
     };
 
@@ -709,24 +732,16 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
 
                 {steps.length > 0 && jobId && (
                     <div className="mt-6 mb-4 px-1">
-                        <button
-                            onClick={initializeBatchConfigs}
-                            disabled={isProcessingBatch}
-                            className="w-full py-3 bg-white text-background hover:bg-white/90 rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] transition-all disabled:opacity-20 flex items-center justify-center gap-2.5 shadow-[0_8px_20px_rgba(255,255,255,0.05)]"
-                        >
-                            {isProcessingBatch ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Synchronizing
-                                </>
-                            ) : (
-                                <>
-                                    Batch Process Engine ({steps.length})
-                                </>
-                            )}
-                        </button>
+                        {!isProcessingBatch && (
+                            <button
+                                onClick={initializeBatchConfigs}
+                                className="w-full py-3 bg-white text-background hover:bg-white/90 rounded-xl font-bold text-[10px] uppercase tracking-[0.2em] transition-all flex items-center justify-center gap-2.5 shadow-[0_8px_20px_rgba(255,255,255,0.05)]"
+                            >
+                                Batch Process Engine ({steps.length})
+                            </button>
+                        )}
                         {batchProgress && (
-                            <p className={`text-[10px] mt-2 text-center font-medium ${batchProgress.includes('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
+                            <p className={`text-[10px] ${isProcessingBatch ? '' : 'mt-2'} text-center font-medium ${batchProgress.includes('Error') ? 'text-red-400' : 'text-emerald-400'}`}>
                                 {batchProgress}
                             </p>
                         )}
@@ -760,9 +775,13 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     setGeneratingImageIndex(index);
                     try {
                         const result = await generateReferenceImage(jobId, config.replacementPrompt, '1:1');
+                        // If image_url is already a full URL (GCS), use it directly
+                        const imageUrl = result.image_url.startsWith('http')
+                            ? result.image_url
+                            : `${API_BASE.replace('/api', '')}${result.image_url}`;
                         setGeneratedImages(prev => ({
                             ...prev,
-                            [index]: { url: `${API_BASE.replace('/api', '')}${result.image_url}`, path: result.image_path }
+                            [index]: { url: imageUrl, path: result.image_path }
                         }));
                         // Update the config with the path
                         const updated = [...batchConfigs];
@@ -786,6 +805,7 @@ const EditPlanPanel: React.FC<EditPlanPanelProps> = ({ findings = [], jobId, onA
                     objectPrompt={selectedStep.violation}
                     startTime={selectedStep.finding.startTime}
                     endTime={selectedStep.finding.endTime}
+                    isProcessingBatch={isProcessingBatch}
                     onActionComplete={(result) => {
                         onActionComplete?.(result.type, { ...result, findingId: selectedStep.finding.id });
                         setModalOpen(false);

@@ -55,7 +55,8 @@ const ComplianceReport: React.FC<ComplianceReportProps> = ({
     const resolvedFindings = findings.filter(f =>
         activeEdits.some(e =>
             e.findingId === f.id ||
-            (e.findingId === undefined && (
+            (e.findingIds && e.findingIds.includes(f.id)) ||
+            (e.findingId === undefined && !e.findingIds && (
                 e.objectName.toLowerCase().includes(f.content.toLowerCase()) ||
                 f.content.toLowerCase().includes(e.objectName.toLowerCase())
             ))

@@ -37,6 +37,8 @@ interface ActionModalProps {
     // Timestamps for Smart Clipping optimization
     startTime?: number;
     endTime?: number;
+    // Batch processing control
+    isProcessingBatch?: boolean;
 }
 
 type Status = 'idle' | 'detecting' | 'processing' | 'completed' | 'error';
@@ -52,7 +54,8 @@ const ActionModal: React.FC<ActionModalProps> = ({
     initialBox,
     timestamp,
     startTime: initialStartTime,
-    endTime: initialEndTime
+    endTime: initialEndTime,
+    isProcessingBatch = false
 }) => {
     const [status, setStatus] = useState<Status>('idle');
     const [error, setError] = useState<string>('');
@@ -252,7 +255,12 @@ const ActionModal: React.FC<ActionModalProps> = ({
         setIsGeneratingImage(true);
         try {
             const result = await generateReferenceImage(jobId, promptToUse, '1:1');
-            setGeneratedImageUrl(`${API_BASE.replace('/api', '')}${result.image_url}`);
+            // If image_url is already a full URL (GCS), use it directly
+            // Otherwise, prepend the API base URL (local path)
+            const imageUrl = result.image_url.startsWith('http')
+                ? result.image_url
+                : `${API_BASE.replace('/api', '')}${result.image_url}`;
+            setGeneratedImageUrl(imageUrl);
             setGeneratedImagePath(result.image_path);
         } catch (err) {
             console.error('Image generation failed:', err);
@@ -997,6 +1005,13 @@ const ActionModal: React.FC<ActionModalProps> = ({
 
                     {/* Status Messages */}
                     <div className="space-y-2">
+                        {isProcessingBatch && (
+                            <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-amber-400 text-xs font-semibold animate-in slide-in-from-top-2">
+                                <Loader2 className="w-4 h-4 shrink-0 animate-spin" />
+                                <span>Batch processing in progress, please wait...</span>
+                            </div>
+                        )}
+
                         {status === 'error' && (
                             <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-xs font-semibold animate-in slide-in-from-top-2">
                                 <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1033,7 +1048,7 @@ const ActionModal: React.FC<ActionModalProps> = ({
                     {status !== 'completed' && (
                         <button
                             onClick={handleExecute}
-                            disabled={status === 'processing' || status === 'detecting'}
+                            disabled={status === 'processing' || status === 'detecting' || isProcessingBatch}
                             className="btn-primary text-xs sm:text-sm"
                         >
                             {status === 'processing' ? (

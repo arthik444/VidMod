@@ -73,6 +73,8 @@ class JobStatusResponse(BaseModel):
     progress: float = Field(..., ge=0, le=100, description="Progress percentage")
     current_step: str
     error: Optional[str] = None
+    original_video_url: Optional[str] = None
+    edited_video_url: Optional[str] = None
 
 
 class DownloadResponse(BaseModel):

@@ -311,7 +311,7 @@ class ElevenLabsDubber:
         Essential for precise timing in dubbing.
         """
         logger.info(f"Trimming silence: {input_path.name}")
-        
+
         # silenceremove filter:
         # stop_periods=-1: trim at end
         # stop_duration=0.1: silence duration
@@ -322,7 +322,7 @@ class ElevenLabsDubber:
             "-af", "silenceremove=start_periods=1:start_silence=0.05:start_threshold=-50dB:stop_periods=-1:stop_duration=0.05:stop_threshold=-50dB",
             str(output_path)
         ]
-        
+
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
             return output_path
@@ -440,17 +440,18 @@ class ElevenLabsDubber:
     ) -> Path:
         """
         Generate speech using a cloned voice.
-        
+        Always generates at 1.2x speed to ensure audio is SHORTER than target.
+
         Args:
             text: Text to speak
             voice_id: ID of the cloned voice
             output_path: Where to save the audio
-            
+
         Returns:
             Path to generated audio file
         """
-        logger.info(f"Generating speech with cloned voice: '{text[:50]}...'")
-        
+        logger.info(f"Generating speech with cloned voice at 1.2x speed: '{text[:50]}...'")
+
         try:
             audio = self.client.text_to_speech.convert(
                 voice_id=voice_id,
@@ -460,17 +461,18 @@ class ElevenLabsDubber:
                     "stability": 0.3,
                     "similarity_boost": 0.95,
                     "style": 0.15,
-                    "use_speaker_boost": True
+                    "use_speaker_boost": True,
+                    "speed": 1.2  # Generate faster to ensure shorter duration
                 }
             )
-            
+
             with open(output_path, 'wb') as f:
                 for chunk in audio:
                     f.write(chunk)
-            
-            logger.info(f"Cloned speech generated: {output_path}")
+
+            logger.info(f"Cloned speech generated (faster): {output_path}")
             return output_path
-            
+
         except Exception as e:
             logger.error(f"Cloned speech generation failed: {e}")
             raise
@@ -734,18 +736,23 @@ class ElevenLabsDubber:
     ) -> Path:
         """
         Generate speech audio using pre-built ElevenLabs voice.
-        
+        Always generates at 1.2x speed to ensure audio is SHORTER than target,
+        so we only expand (never compress) during time-stretching.
+
         Args:
             text: Text to speak
             voice_type: "male" or "female"
             output_path: Where to save audio
-            
+
         Returns:
             Path to generated audio file
         """
         voice_id = VOICE_PRESETS.get(voice_type, VOICE_PRESETS["female"])
-        logger.info(f"Generating speech with {voice_type} voice: '{text}'")
-        
+
+        # Always generate at 1.2x speed (faster) to ensure shorter duration
+        # This way we only expand (slow down) to fit target, never compress
+        logger.info(f"Generating speech with {voice_type} voice at 1.2x speed: '{text}'")
+
         try:
             # Generate audio using text_to_speech
             audio = self.client.text_to_speech.convert(
@@ -754,18 +761,19 @@ class ElevenLabsDubber:
                 model_id="eleven_multilingual_v2",
                 voice_settings={
                     "stability": 0.35,
-                    "similarity_boost": 0.90
+                    "similarity_boost": 0.90,
+                    "speed": 1.2  # Generate faster to ensure shorter duration
                 }
             )
-            
+
             # Save audio - audio is an iterator of bytes
             with open(output_path, 'wb') as f:
                 for chunk in audio:
                     f.write(chunk)
-            
-            logger.info(f"Speech generated: {output_path}")
+
+            logger.info(f"Speech generated (faster): {output_path}")
             return output_path
-            
+
         except Exception as e:
             logger.error(f"Speech generation failed: {e}")
             raise
@@ -837,30 +845,30 @@ class ElevenLabsDubber:
             
             with tempfile.TemporaryDirectory() as temp_dir:
                 temp_path = Path(temp_dir)
-                
+
                 dub_segments = []
                 for i, c in enumerate(clusters):
-                    # Generate speech for the ENTIRE phrase
+                    # Generate speech
                     raw_dub = temp_path / f"phrase_raw_{i}.mp3"
                     self.generate_speech(
                         text=c['phrase'],
                         voice_type=voice_type,
                         output_path=raw_dub
                     )
-                    
-                    # Total duration of the cluster region
+
+                    # Time-stretch to EXACTLY match user's timing
                     target_duration = c['end_time'] - c['start_time']
                     stretched_dub = temp_path / f"phrase_stretched_{i}.mp3"
-                    
+
                     self.time_stretch_audio(
                         input_path=raw_dub,
                         output_path=stretched_dub,
                         target_duration=target_duration
                     )
-                    
+
                     dub_segments.append((stretched_dub, c['start_time'], c['end_time']))
-                
-                # Step 3: Patch audio using clustered segments
+
+                # Patch audio using segments
                 self.patch_audio_seamless(
                     video_path=video_path,
                     dub_segments=dub_segments,
@@ -929,26 +937,26 @@ class ElevenLabsDubber:
                 
                 dub_segments = []
                 for i, c in enumerate(clusters):
-                    # Generate speech for the ENTIRE phrase
+                    # Generate speech
                     raw_dub = temp_path / f"phrase_raw_{i}.mp3"
                     self.generate_speech(
                         text=c['phrase'],
                         voice_type=voice_type,
                         output_path=raw_dub
                     )
-                    
-                    # Total duration of the cluster region
+
+                    # Time-stretch to EXACTLY match user's timing
                     target_duration = c['end_time'] - c['start_time']
                     stretched_dub = temp_path / f"phrase_stretched_{i}.mp3"
-                    
+
                     self.time_stretch_audio(
                         input_path=raw_dub,
                         output_path=stretched_dub,
                         target_duration=target_duration
                     )
-                    
+
                     dub_segments.append((stretched_dub, c['start_time'], c['end_time']))
-                
+
                 # Seamlessly patch dubbed audio onto video
                 self.patch_audio_seamless(
                     video_path=video_path,
@@ -1065,17 +1073,17 @@ class ElevenLabsDubber:
                         voice_id=cloned_voice_id,
                         output_path=raw_dub
                     )
-                    
-                    # Total duration of the cluster region
+
+                    # Time-stretch to EXACTLY match user's timing
                     target_duration = c['end_time'] - c['start_time']
                     stretched_dub = temp_path / f"phrase_stretched_{i}.mp3"
-                    
+
                     self.time_stretch_audio(
                         input_path=raw_dub,
                         output_path=stretched_dub,
                         target_duration=target_duration
                     )
-                    
+
                     dub_segments.append((stretched_dub, c['start_time'], c['end_time']))
                 
                 # Seamlessly patch dubbed audio onto video
@@ -1150,7 +1158,8 @@ class ElevenLabsDubber:
                     word_replacements=custom_replacements or {},
                     output_path=output_path,
                     voice_sample_start=0,
-                    voice_sample_end=10
+                    voice_sample_end=10,
+                    profanity_matches=profanity_matches  # ✅ Pass user's matches!
                 )
             
             # Step 1: Create voice clone for each speaker
@@ -1214,24 +1223,25 @@ class ElevenLabsDubber:
                         # Fallback to first available voice
                         voice_id = list(cloned_voices.values())[0]
                         logger.warning(f"No clone for {c['speaker_id']}, using fallback")
-                    
+
+                    # Generate with cloned voice
                     raw_dub = temp_path / f"phrase_raw_{i}.mp3"
                     self.generate_speech_with_clone(
                         text=c['phrase'],
                         voice_id=voice_id,
                         output_path=raw_dub
                     )
-                    
-                    # Total duration of the cluster region
+
+                    # Time-stretch to EXACTLY match user's timing
                     target_duration = c['end_time'] - c['start_time']
                     stretched_dub = temp_path / f"phrase_stretched_{i}.mp3"
-                    
+
                     self.time_stretch_audio(
                         input_path=raw_dub,
                         output_path=stretched_dub,
                         target_duration=target_duration
                     )
-                    
+
                     dub_segments.append((stretched_dub, c['start_time'], c['end_time']))
                 
                 # Step 4: Seamlessly patch dubbed audio onto video

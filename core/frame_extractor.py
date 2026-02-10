@@ -234,12 +234,24 @@ class FrameExtractor:
             "-af", f"atrim=start={buffered_start:.6f}:end={buffered_end:.6f},asetpts=PTS-STARTPTS",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "18",
             "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart", # Required for Runway/Web playback
             str(output_path)
         ]
 
         try:
             subprocess.run(cmd, capture_output=True, text=True, check=True)
             logger.info(f"Frame-accurate clip extracted: {output_path}")
+
+            # Verify extracted clip is valid (not corrupted)
+            if output_path.exists():
+                file_size_kb = output_path.stat().st_size / 1024
+                logger.info(f"Extracted clip size: {file_size_kb:.2f} KB")
+
+                # Sanity check: clip should be at least 100KB for valid video
+                if file_size_kb < 100:
+                    logger.error(f"❌ Extracted clip suspiciously small: {file_size_kb:.2f} KB - likely corrupted!")
+                    raise RuntimeError(f"Clip extraction produced corrupted file ({file_size_kb:.2f} KB)")
+
             return output_path
         except subprocess.CalledProcessError as e:
             logger.error(f"Clip extraction failed: {e.stderr}")

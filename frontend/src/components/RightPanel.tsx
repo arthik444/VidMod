@@ -23,6 +23,9 @@ interface RightPanelProps {
     onPreviewVersion?: (version: number) => void;
     onToggleVersion?: (id: string) => void;
     selectedVersion?: number | null;
+    isProcessingBatch?: boolean;
+    batchProgress?: string;
+    onBatchStateChange?: (processing: boolean, progress: string) => void;
 }
 
 const RightPanel: React.FC<RightPanelProps> = ({
@@ -35,7 +38,10 @@ const RightPanel: React.FC<RightPanelProps> = ({
     editHistory = [],
     onPreviewVersion,
     onToggleVersion,
-    selectedVersion
+    selectedVersion,
+    isProcessingBatch = false,
+    batchProgress = '',
+    onBatchStateChange
 }) => {
     const [activePanel, setActivePanel] = useState<'risks' | 'plan' | 'history' | 'dubbing'>('risks');
 
@@ -296,7 +302,14 @@ const RightPanel: React.FC<RightPanelProps> = ({
                         exit={{ opacity: 0, x: -10 }}
                         className="flex-1 overflow-hidden"
                     >
-                        <EditPlanPanel findings={findings} jobId={jobId} onActionComplete={onActionComplete} />
+                        <EditPlanPanel
+                            findings={findings}
+                            jobId={jobId}
+                            onActionComplete={onActionComplete}
+                            isProcessingBatch={isProcessingBatch}
+                            batchProgress={batchProgress}
+                            onBatchStateChange={onBatchStateChange}
+                        />
                     </motion.div>
                 )}
                 {activePanel === 'history' && (
