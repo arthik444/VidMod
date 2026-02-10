@@ -141,15 +141,22 @@ class VideoPipeline:
 
     def prepare_input_video(self, job_id: str, use_original: bool = False) -> Path:
         """
-        Prepare input video for the next operation.
-        If a previous output exists (chained operation), use it.
-        Otherwise use the original video.
-        Ensures input file exists locally, downloading from GCS if needed (Cloud Run).
+        Prepare input video for the next operation using GCS-as-disk architecture.
+
+        CLOUD RUN ARCHITECTURE:
+        - ALWAYS download from GCS (source of truth)
+        - Never rely on ephemeral local disk
+        - Use /tmp for processing
+        - Each operation starts fresh from GCS
+
+        For chained operations (blur → runway):
+        - Downloads previous output from GCS
+        For first operation or use_original=True:
+        - Downloads original video from GCS
 
         Args:
             job_id: Job ID
-            use_original: If True, always use original video (skip chaining).
-                         Use for replacement operations (Runway, SAM) that need the original unmodified video.
+            use_original: If True, download original video instead of previous output
         """
         job = self.jobs.get(job_id)
         if not job:
@@ -157,53 +164,63 @@ class VideoPipeline:
             job = self._restore_job_state(job_id)
             if not job:
                 raise ValueError(f"Job {job_id} not found")
-            self.jobs[job_id] = job # Cache it
+            self.jobs[job_id] = job
 
-        # Skip chaining if use_original=True (for replacement operations)
-        if not use_original:
-            # Priority 1: Use local output path if it exists (fastest for local/same-instance)
-            if job.output_path and job.output_path.exists():
-                logger.info(f"Using previous local output for chaining: {job.output_path}")
-                return job.output_path
+        import tempfile
 
-            # Priority 2: Use GCS output URL (persistence across instances)
-            if job.output_gcs_url and self.gcs_uploader:
-                logger.info(f"Downloading previous output from GCS for chaining: {job.output_gcs_url}")
-                # Download to a temporary "input_chained.mp4"
-                job_dir = self._get_job_dir(job_id)
-                chained_input_path = job_dir / f"input_chained_{uuid.uuid4().hex[:6]}.mp4"
+        # Use /tmp for processing (Cloud Run ephemeral storage)
+        temp_dir = Path(tempfile.gettempdir()) / "vidmod" / job_id
+        temp_dir.mkdir(parents=True, exist_ok=True)
 
-                self.gcs_uploader.download_file(job.output_gcs_url, chained_input_path)
+        # Decide which video to download: previous output (chaining) or original
+        if not use_original and job.output_gcs_url and self.gcs_uploader:
+            # CHAINING: Download previous operation's output from GCS
+            logger.info(f"📥 GCS-as-disk: Downloading previous output for chaining from {job.output_gcs_url}")
+            download_url = job.output_gcs_url
+            temp_path = temp_dir / f"input_chained_{uuid.uuid4().hex[:6]}.mp4"
+        elif job.gcs_url and self.gcs_uploader:
+            # ORIGINAL: Download original video from GCS
+            logger.info(f"📥 GCS-as-disk: Downloading original video from {job.gcs_url}")
+            download_url = job.gcs_url
+            temp_path = temp_dir / f"input_original_{uuid.uuid4().hex[:6]}.mp4"
+        else:
+            raise ValueError(f"No GCS URL available for job {job_id}")
 
-                # Verify download completed correctly
-                if chained_input_path.exists():
-                    file_size_mb = chained_input_path.stat().st_size / (1024 * 1024)
-                    logger.info(f"✅ Downloaded file size: {file_size_mb:.2f} MB")
+        # Download from GCS (always fresh, no caching)
+        self.gcs_uploader.download_file(download_url, temp_path)
 
-                    # Sanity check: file should be at least 1MB for a valid video
-                    if file_size_mb < 1.0:
-                        logger.error(f"❌ Downloaded file suspiciously small: {file_size_mb:.2f} MB")
-                        raise ValueError(f"Downloaded video file too small ({file_size_mb:.2f} MB), possible corruption")
-                else:
-                    logger.error(f"❌ Downloaded file not found: {chained_input_path}")
-                    raise FileNotFoundError(f"Download failed: {chained_input_path}")
+        # Verify download completed correctly
+        if temp_path.exists():
+            file_size_mb = temp_path.stat().st_size / (1024 * 1024)
+            logger.info(f"✅ Downloaded to /tmp: {file_size_mb:.2f} MB")
 
-                return chained_input_path
+            # Sanity check: file should be at least 1MB for a valid video
+            if file_size_mb < 1.0:
+                logger.error(f"❌ Downloaded file suspiciously small: {file_size_mb:.2f} MB")
+                raise ValueError(f"Downloaded video file too small ({file_size_mb:.2f} MB), possible corruption")
+        else:
+            logger.error(f"❌ Downloaded file not found: {temp_path}")
+            raise FileNotFoundError(f"Download failed: {temp_path}")
 
-        # Priority 3: Fallback to Original Video (Local)
-        if job.video_path and job.video_path.exists():
-             return job.video_path
-             
-        # Priority 4: Download Original from GCS (Cloud Run restart case)
-        if job.gcs_url and self.gcs_uploader:
-             logger.info(f"Downloading original input from GCS: {job.gcs_url}")
-             job_dir = self._get_job_dir(job_id)
-             original_input_path = job_dir / f"input_restored_{uuid.uuid4().hex[:6]}.mp4"
-             self.gcs_uploader.download_file(job.gcs_url, original_input_path)
-             job.video_path = original_input_path # Update local path
-             return original_input_path
-             
-        raise ValueError("No input video found for processing (checked local and GCS).")
+        return temp_path
+
+    def cleanup_temp_files(self, job_id: str):
+        """
+        Clean up temporary files for a job.
+        Call this after uploading results to GCS.
+
+        GCS-as-disk architecture: We don't need local files after uploading to GCS.
+        """
+        import tempfile
+        import shutil
+
+        temp_dir = Path(tempfile.gettempdir()) / "vidmod" / job_id
+        if temp_dir.exists():
+            try:
+                shutil.rmtree(temp_dir)
+                logger.info(f"🧹 Cleaned up temp files: {temp_dir}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temp files: {e}")
 
     def _save_job_state(self, job_id: str):
         """Save job state to GCS for stateless persistence."""
