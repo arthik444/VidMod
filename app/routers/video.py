@@ -285,33 +285,67 @@ async def process_upload(
 @router.get("/download/{job_id}")
 async def download_video(
     job_id: str,
+    original: bool = False,
     pipeline: VideoPipeline = Depends(get_pipeline)
 ):
     """
     Download the processed video for a job.
     Returns the edited video if available, otherwise the original video.
+    On Cloud Run: Always prefer GCS URLs over local files (multi-container issue).
+    On local dev: Prefer local files for faster serving.
     """
-    from fastapi.responses import FileResponse
-    
+    from fastapi.responses import FileResponse, RedirectResponse
+    import os
+
     job = pipeline.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
+
+    # Detect if running on Cloud Run (prefer GCS URLs)
+    is_cloud_run = os.getenv("K_SERVICE") is not None
+
+    if is_cloud_run:
+        # CLOUD RUN: Prefer GCS URLs
+        target_url = None
+        
+        if original:
+             target_url = job.gcs_url
+        else:
+             # Default to output, fallback to input if no output yet
+             target_url = job.output_gcs_url if (hasattr(job, 'output_gcs_url') and job.output_gcs_url) else job.gcs_url
+
+        if target_url:
+            # Check if it's a gs:// URI that needs signing
+            if target_url.startswith("gs://"):
+                try:
+                    # Extract key: gs://bucket_name/key -> key
+                    parts = target_url.replace("gs://", "").split("/", 1)
+                    if len(parts) == 2:
+                        key = parts[1]
+                        if pipeline.gcs_uploader:
+                             signed_url = pipeline.gcs_uploader.generate_download_url(key)
+                             logger.info(f"☁️ Cloud Run: Redirecting to Signed URL for {key}")
+                             return RedirectResponse(url=signed_url)
+                except Exception as e:
+                    logger.error(f"Failed to generate signed URL for {target_url}: {e}")
+            
+            # If not gs:// or signing failed, try direct redirect (public URL)
+            logger.info(f"☁️ Cloud Run: Redirecting to GCS: {target_url}")
+            return RedirectResponse(url=target_url)
+
+    # LOCAL DEV: Prefer local files
+    file_path = job.video_path if original else (job.output_path if job.output_path and job.output_path.exists() else job.video_path)
     
-    # Serve edited video if available, otherwise original
-    if job.output_path and job.output_path.exists():
-        video_path = job.output_path
-        logger.info(f"Serving edited video: {video_path}")
-    elif job.video_path and job.video_path.exists():
-        video_path = job.video_path
-        logger.info(f"Serving original video: {video_path}")
-    else:
-        raise HTTPException(status_code=404, detail="Video file not found")
-    
-    return FileResponse(
-        video_path,
-        media_type="video/mp4",
-        filename=f"{job_id}.mp4"
-    )
+    if not file_path or not file_path.exists():
+         # Fallback to GCS if local file missing (e.g. restart)
+         if original and job.gcs_url:
+              return RedirectResponse(job.gcs_url)
+         if not original and hasattr(job, 'output_gcs_url') and job.output_gcs_url:
+              return RedirectResponse(job.output_gcs_url)
+         
+         raise HTTPException(status_code=404, detail="Video file not found locally or in GCS")
+
+    return FileResponse(file_path)
 
 
 @router.get("/videos", response_model=List[VideoMetadata])
@@ -547,26 +581,36 @@ async def get_job_status(
     job = pipeline.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
-    # Map pipeline stage to job status
+
+    # Map PipelineStage to JobStatus
     stage_map = {
         PipelineStage.INITIALIZED: JobStatus.PENDING,
         PipelineStage.EXTRACTING_FRAMES: JobStatus.EXTRACTING_FRAMES,
         PipelineStage.DETECTING_OBJECTS: JobStatus.DETECTING_OBJECTS,
         PipelineStage.GENERATING_MASKS: JobStatus.GENERATING_MASKS,
-        PipelineStage.VIDEO_SEGMENTING: JobStatus.GENERATING_MASKS,  # Map to existing status
+        PipelineStage.VIDEO_SEGMENTING: JobStatus.GENERATING_MASKS,
         PipelineStage.INPAINTING: JobStatus.INPAINTING,
         PipelineStage.RECONSTRUCTING: JobStatus.RECONSTRUCTING,
         PipelineStage.COMPLETED: JobStatus.COMPLETED,
         PipelineStage.FAILED: JobStatus.FAILED,
     }
-    
+
+    # Construct API URLs for checking persistence
+    original_url = f"/api/download/{job_id}?original=true"
+
+    edited_url = None
+    # Check if job is completed or has output
+    if job.stage == PipelineStage.COMPLETED or job.output_path or (hasattr(job, 'output_gcs_url') and job.output_gcs_url):
+         edited_url = f"/api/download/{job_id}"
+
     return JobStatusResponse(
-        job_id=job_id,
+        job_id=job.job_id,
         status=stage_map.get(job.stage, JobStatus.PENDING),
         progress=job.progress,
-        current_step=job.stage.value,
-        error=job.error
+        current_step=str(job.stage.value),
+        error=job.error,
+        original_video_url=original_url,
+        edited_video_url=edited_url
     )
 
 
@@ -1212,10 +1256,22 @@ async def replace_with_nano_banana(
             fps=fps,
             audio_path=job.audio_path if job.audio_path and job.audio_path.exists() else None
         )
-        
+
         job.output_path = output_path
         job.inpainted_paths = edited_paths
-        
+
+        # Upload output to GCS for persistence (required for Cloud Run)
+        if pipeline.gcs_uploader:
+            try:
+                output_gcs_key = f"jobs/{job_id}/output_nano.mp4"
+                job.output_gcs_url = pipeline.gcs_uploader.upload_video(output_path, output_gcs_key)
+                logger.info(f"✅ Output uploaded to GCS: {job.output_gcs_url}")
+            except Exception as e:
+                logger.warning(f"Failed to upload output to GCS: {e}")
+
+        # Save job state
+        pipeline._save_job_state(job_id)
+
         return NanoBananaResponse(
             job_id=job_id,
             status="completed",
@@ -1310,10 +1366,28 @@ async def analyze_video(
     # Pipeline stage INITIALIZED means it might still be downloading in background
     if job.stage == PipelineStage.INITIALIZED:
          raise HTTPException(status_code=409, detail="Video is still processing/downloading. Please wait.")
-    
+
+    # Download original video from GCS if missing locally (Cloud Run ephemeral storage)
     if not job.video_path or not job.video_path.exists():
-        raise HTTPException(status_code=400, detail="Video file not found")
-    
+        if job.gcs_url:
+            try:
+                logger.info(f"⬇️ Video file missing locally, downloading from GCS: {job.gcs_url}")
+                job.video_path.parent.mkdir(parents=True, exist_ok=True)
+                import requests
+                response = requests.get(job.gcs_url, stream=True)
+                if response.status_code == 200:
+                    with open(job.video_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    logger.info(f"✅ Original video downloaded from GCS: {job.video_path}")
+                else:
+                    raise HTTPException(status_code=400, detail=f"Failed to download video from GCS (HTTP {response.status_code})")
+            except Exception as e:
+                logger.error(f"Failed to download video from GCS: {e}")
+                raise HTTPException(status_code=400, detail=f"Video file not found and GCS download failed: {str(e)}")
+        else:
+            raise HTTPException(status_code=400, detail="Video file not found")
+
     try:
         logger.info(f"Starting Gemini analysis for job {job_id}")
         if platform and region and rating:
@@ -1381,24 +1455,59 @@ async def blur_object(
     """
     from core.video_builder import VideoBuilder
     import hashlib
-    
+
     job = pipeline.get_job(request.job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
+    # Download original video from GCS if missing locally (Cloud Run ephemeral storage)
     if not job.video_path or not job.video_path.exists():
-        raise HTTPException(status_code=400, detail="Video file not found")
-    
+        if job.gcs_url:
+            try:
+                logger.info(f"⬇️ Video file missing locally, downloading from GCS: {job.gcs_url}")
+                job.video_path.parent.mkdir(parents=True, exist_ok=True)
+                import requests
+                response = requests.get(job.gcs_url, stream=True)
+                if response.status_code == 200:
+                    with open(job.video_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    logger.info(f"✅ Original video downloaded from GCS: {job.video_path}")
+                else:
+                    raise HTTPException(status_code=400, detail=f"Failed to download video from GCS (HTTP {response.status_code})")
+            except Exception as e:
+                logger.error(f"Failed to download video from GCS: {e}")
+                raise HTTPException(status_code=400, detail=f"Video file not found and GCS download failed: {str(e)}")
+        else:
+            raise HTTPException(status_code=400, detail="Video file not found")
+
     try:
         # Define job directory first (needed for both paths)
         job_dir = job.video_path.parent
         
+        # CLOUD RUN CHAINING FIX: Download previous output from GCS if missing locally
+        if job.output_gcs_url and (not job.output_path or not job.output_path.exists()):
+            try:
+                logger.info(f"⬇️ Downloading previous output from GCS for chaining: {job.output_gcs_url}")
+                job.output_path.parent.mkdir(parents=True, exist_ok=True)
+                import requests
+                response = requests.get(job.output_gcs_url, stream=True)
+                if response.status_code == 200:
+                    with open(job.output_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    logger.info(f"✅ Previous output downloaded for chaining: {job.output_path}")
+                else:
+                    logger.warning(f"Failed to download previous output (HTTP {response.status_code})")
+            except Exception as e:
+                logger.warning(f"Failed to download previous output for chaining: {e}")
+
         # SMART CLIPPING OPTIMIZATION: If timestamps provided, process only the clip
         use_smart_clipping = request.start_time is not None and request.end_time is not None
-        
+
         if use_smart_clipping:
             logger.info(f"🚀 Smart Clipping enabled: processing {request.start_time:.2f}s to {request.end_time:.2f}s")
-            
+
             # Determine source video for extraction (for effect chaining)
             if job.output_path and job.output_path.exists():
                 source_video_for_clip = job.output_path
@@ -1516,11 +1625,23 @@ async def blur_object(
                 end_time=request.end_time,
                 buffer_seconds=0.0  # Exact stitching, no padding
             )
-            
+
             # Update job with final output
             job.output_path = output_path
             logger.info(f"✅ Smart Clipping complete: {output_path}")
-            
+
+            # Upload output to GCS for persistence (required for Cloud Run)
+            if pipeline.gcs_uploader:
+                try:
+                    output_gcs_key = f"jobs/{request.job_id}/output_blur_clip.mp4"
+                    job.output_gcs_url = pipeline.gcs_uploader.upload_video(output_path, output_gcs_key)
+                    logger.info(f"✅ Output uploaded to GCS: {job.output_gcs_url}")
+                except Exception as e:
+                    logger.warning(f"Failed to upload output to GCS: {e}")
+
+            # Save job state
+            pipeline._save_job_state(request.job_id)
+
         else:
             # LEGACY FULL VIDEO PROCESSING (when no timestamps provided)
             logger.info("⚠️ Processing full video (no timestamps provided)")
@@ -1558,7 +1679,24 @@ async def blur_object(
             # Step 2: Apply blur/pixelate effect using FFmpeg
             logger.info(f"Step 2: Applying {request.effect_type} effect...")
             video_builder = VideoBuilder(ffmpeg_path=pipeline.ffmpeg_path)
-            
+
+            # CLOUD RUN CHAINING FIX: Download previous output from GCS if missing locally
+            if job.output_gcs_url and (not job.output_path or not job.output_path.exists()):
+                try:
+                    logger.info(f"⬇️ Downloading previous output from GCS for chaining: {job.output_gcs_url}")
+                    job.output_path.parent.mkdir(parents=True, exist_ok=True)
+                    import requests
+                    response = requests.get(job.output_gcs_url, stream=True)
+                    if response.status_code == 200:
+                        with open(job.output_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                f.write(chunk)
+                        logger.info(f"✅ Previous output downloaded for chaining: {job.output_path}")
+                    else:
+                        logger.warning(f"Failed to download previous output (HTTP {response.status_code})")
+                except Exception as e:
+                    logger.warning(f"Failed to download previous output for chaining: {e}")
+
             # Use previous output if exists (for chaining effects)
             if job.output_path and job.output_path.exists():
                 input_video = job.output_path
@@ -1583,11 +1721,23 @@ async def blur_object(
                     output_path=output_path,
                     blur_strength=request.blur_strength
                 )
-            
+
             # Update job with final output
             job.output_path = output_path
             logger.info(f"Blur effect applied successfully: {output_path}")
-        
+
+        # Upload output to GCS for persistence (required for Cloud Run)
+        if pipeline.gcs_uploader:
+            try:
+                output_gcs_key = f"jobs/{request.job_id}/output_blur_full.mp4"
+                job.output_gcs_url = pipeline.gcs_uploader.upload_video(output_path, output_gcs_key)
+                logger.info(f"✅ Output uploaded to GCS: {job.output_gcs_url}")
+            except Exception as e:
+                logger.warning(f"Failed to upload output to GCS: {e}")
+
+        # Save job state
+        pipeline._save_job_state(request.job_id)
+
         return BlurEffectResponse(
             job_id=request.job_id,
             status="completed",
@@ -1705,9 +1855,21 @@ async def replace_with_pika(
             negative_prompt=negative_prompt,
             duration=duration
         )
-        
+
         job.output_path = result_path
-        
+
+        # Upload output to GCS for persistence (required for Cloud Run)
+        if pipeline.gcs_uploader:
+            try:
+                output_gcs_key = f"jobs/{job_id}/output_pika.mp4"
+                job.output_gcs_url = pipeline.gcs_uploader.upload_video(result_path, output_gcs_key)
+                logger.info(f"✅ Output uploaded to GCS: {job.output_gcs_url}")
+            except Exception as e:
+                logger.warning(f"Failed to upload output to GCS: {e}")
+
+        # Save job state
+        pipeline._save_job_state(job_id)
+
         return PikaReplaceResponse(
             job_id=job_id,
             status="completed",
@@ -1789,12 +1951,19 @@ async def generate_reference_image(
             aspect_ratio=aspect_ratio,
             negative_prompt=negative_prompt
         )
-        
-        # Create URL for accessing the image
-        image_url = f"/api/jobs/{job_id}/reference_image_{image_id}.png"
-        
+
         logger.info(f"✅ Reference image generated: {saved_path}")
-        
+
+        # Upload to GCS for Cloud Run compatibility
+        image_url = f"/api/jobs/{job_id}/reference_image_{image_id}.png"  # Default fallback
+        if pipeline.gcs_uploader:
+            try:
+                gcs_key = f"jobs/{job_id}/reference_image_{image_id}.png"
+                image_url = pipeline.gcs_uploader.upload_image(saved_path, gcs_key, make_public=True)
+                logger.info(f"☁️ Reference image uploaded to GCS: {image_url}")
+            except Exception as e:
+                logger.warning(f"Failed to upload reference image to GCS: {e}")
+
         return GenerateImageResponse(
             job_id=job_id,
             image_url=image_url,
@@ -1910,14 +2079,10 @@ async def replace_with_runway(
         
         if use_smart_clipping:
             logger.info(f"🚀 Smart Clipping enabled: processing {start_time:.2f}s to {end_time:.2f}s")
-            
-            # Determine source video for extraction
-            if job.output_path and job.output_path.exists():
-                source_video_for_clip = job.output_path
-                logger.info(f"✨ Chaining effect: extracting clip from previous output")
-            else:
-                source_video_for_clip = job.video_path
-                logger.info(f"📹 First effect: extracting clip from original video")
+
+            # Prepare input video (handles chaining and cloud restoration)
+            source_video_for_clip = pipeline.prepare_input_video(job_id)
+            logger.info(f"Using video source: {source_video_for_clip}")
             
             # Runway requires at least 1 second of video
             MIN_RUNWAY_DURATION = 1.0
@@ -1959,20 +2124,30 @@ async def replace_with_runway(
                     )
         else:
             # No smart clipping - use the full video
-            # If no GCS URL, we must upload the full video
-            if not job.gcs_url:
-                if pipeline.gcs_uploader:
-                    logger.info("Uploading full video to GCS for Runway...")
-                    key = f"jobs/{job.job_id}/input.mp4"
-                    job.gcs_url = pipeline.gcs_uploader.upload_video(job.video_path, key)
-                    pipeline._save_job_state(job.job_id)
-                else:
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Runway requires a publicly accessible video URL. GCS uploader not configured."
-                    )
+            # We MUST ensure the video has 'faststart' for Runway
+            # So we re-encode it using extract_clip (which now has faststart)
+            logger.info("Optimizing full video for Runway (adding faststart)...")
+            optimized_path = job_dir / f"runway_optimized_{job.job_id}.mp4"
             
-            video_url = job.gcs_url
+            # Use the prepared input video (which might be a previous output)
+            pipeline.frame_extractor.extract_clip(
+                video_path=source_video_for_clip,
+                output_path=optimized_path,
+                start_time=0,
+                end_time=duration,
+                buffer_seconds=0.0
+            )
+            
+            # Upload optimized video
+            if pipeline.gcs_uploader:
+                logger.info("Uploading optimized full video to GCS for Runway...")
+                key = f"jobs/{job.job_id}/runway_optimized.mp4"
+                video_url = pipeline.gcs_uploader.upload_video(optimized_path, key)
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Runway requires a publicly accessible video URL. GCS uploader not configured."
+                )
         
         if not video_url:
             raise HTTPException(
@@ -2018,9 +2193,21 @@ async def replace_with_runway(
             # Update result path to be the full stitched video
             result_path = final_stitched_path
             logger.info(f"✅ Video stitching complete: {result_path}")
-        
+
         job.output_path = result_path
-        
+
+        # Upload output to GCS for persistence (required for Cloud Run)
+        if pipeline.gcs_uploader:
+            try:
+                output_gcs_key = f"jobs/{job_id}/output_runway.mp4"
+                job.output_gcs_url = pipeline.gcs_uploader.upload_video(result_path, output_gcs_key)
+                logger.info(f"✅ Output uploaded to GCS: {job.output_gcs_url}")
+            except Exception as e:
+                logger.warning(f"Failed to upload output to GCS: {e}")
+
+        # Save job state
+        pipeline._save_job_state(job_id)
+
         return RunwayReplaceResponse(
             job_id=job_id,
             status="completed",
@@ -2057,10 +2244,28 @@ async def analyze_audio(
         job = pipeline.get_job(job_id)
         if not job:
             raise HTTPException(status_code=404, detail="Job not found")
-        
+
+        # Download original video from GCS if missing locally (Cloud Run ephemeral storage)
         if not job.video_path or not job.video_path.exists():
-            raise HTTPException(status_code=400, detail="Video file not found")
-        
+            if job.gcs_url:
+                try:
+                    logger.info(f"⬇️ Video file missing locally, downloading from GCS: {job.gcs_url}")
+                    job.video_path.parent.mkdir(parents=True, exist_ok=True)
+                    import requests
+                    response = requests.get(job.gcs_url, stream=True)
+                    if response.status_code == 200:
+                        with open(job.video_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                f.write(chunk)
+                        logger.info(f"✅ Original video downloaded from GCS: {job.video_path}")
+                    else:
+                        raise HTTPException(status_code=400, detail=f"Failed to download video from GCS (HTTP {response.status_code})")
+                except Exception as e:
+                    logger.error(f"Failed to download video from GCS: {e}")
+                    raise HTTPException(status_code=400, detail=f"Video file not found and GCS download failed: {str(e)}")
+            else:
+                raise HTTPException(status_code=400, detail="Video file not found")
+
         # Check if we have cached results
         if job.profanity_matches is not None:
             logger.info(f"CACHE HIT: Using cached profanity analysis for job {job_id} (analyzed at {job.profanity_analyzed_at})")
@@ -2164,14 +2369,49 @@ async def censor_audio(
     job = pipeline.get_job(request.job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
+    # Download original video from GCS if missing locally (Cloud Run ephemeral storage)
     if not job.video_path or not job.video_path.exists():
-        raise HTTPException(status_code=400, detail="Video file not found")
-    
+        if job.gcs_url:
+            try:
+                logger.info(f"⬇️ Video file missing locally, downloading from GCS: {job.gcs_url}")
+                job.video_path.parent.mkdir(parents=True, exist_ok=True)
+                import requests
+                response = requests.get(job.gcs_url, stream=True)
+                if response.status_code == 200:
+                    with open(job.video_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    logger.info(f"✅ Original video downloaded from GCS: {job.video_path}")
+                else:
+                    raise HTTPException(status_code=400, detail=f"Failed to download video from GCS (HTTP {response.status_code})")
+            except Exception as e:
+                logger.error(f"Failed to download video from GCS: {e}")
+                raise HTTPException(status_code=400, detail=f"Video file not found and GCS download failed: {str(e)}")
+        else:
+            raise HTTPException(status_code=400, detail="Video file not found")
+
     job_dir = Path(f"storage/jobs/{request.job_id}")
-    
+
     try:
         logger.info(f"Starting audio censoring in '{request.mode}' mode")
+
+        # CLOUD RUN CHAINING FIX: Download previous output from GCS if missing locally
+        if job.output_gcs_url and (not job.output_path or not job.output_path.exists()):
+            try:
+                logger.info(f"⬇️ Downloading previous output from GCS for chaining: {job.output_gcs_url}")
+                job.output_path.parent.mkdir(parents=True, exist_ok=True)
+                import requests
+                response = requests.get(job.output_gcs_url, stream=True)
+                if response.status_code == 200:
+                    with open(job.output_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    logger.info(f"✅ Previous output downloaded for chaining: {job.output_path}")
+                else:
+                    logger.warning(f"Failed to download previous output (HTTP {response.status_code})")
+            except Exception as e:
+                logger.warning(f"Failed to download previous output for chaining: {e}")
 
         # Determine source video: use output_path if exists (chained effects), otherwise original
         source_video = job.output_path if (job.output_path and job.output_path.exists()) else job.video_path
@@ -2197,6 +2437,10 @@ async def censor_audio(
                 )
                 for m in request.profanity_matches
             ]
+            # DEBUG: Log actual timestamps received
+            for match in profanity_matches:
+                duration = match.end_time - match.start_time
+                logger.info(f"  📍 Match: '{match.word}' → '{match.replacement}' | {match.start_time:.2f}s-{match.end_time:.2f}s (duration: {duration:.2f}s)")
         # Priority 2: Cached matches from JobState
         elif job.profanity_matches is not None:
             logger.info(f"Step 1: CACHE HIT - Using {len(job.profanity_matches)} cached profanity matches from JobState")
@@ -2336,10 +2580,22 @@ async def censor_audio(
         
         # Update job with censored video
         job.output_path = output_path
-        
+
+        # Upload output to GCS for persistence (required for Cloud Run)
+        if pipeline.gcs_uploader:
+            try:
+                output_gcs_key = f"jobs/{request.job_id}/output_censored.mp4"
+                job.output_gcs_url = pipeline.gcs_uploader.upload_video(output_path, output_gcs_key)
+                logger.info(f"✅ Output uploaded to GCS: {job.output_gcs_url}")
+            except Exception as e:
+                logger.warning(f"Failed to upload output to GCS: {e}")
+
+        # Save job state
+        pipeline._save_job_state(request.job_id)
+
         # Build response
         unique_words = list(set(m.word for m in profanity_matches))
-        
+
         # Convert profanity matches to Pydantic models for response
         match_models = [
             ProfanityMatchModel(
@@ -2422,13 +2678,31 @@ async def suggest_word_replacements(
     job = pipeline.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
-    
+
+    # Download original video from GCS if missing locally (Cloud Run ephemeral storage)
     if not job.video_path or not job.video_path.exists():
-        raise HTTPException(status_code=400, detail="Video file not found")
-    
+        if job.gcs_url:
+            try:
+                logger.info(f"⬇️ Video file missing locally, downloading from GCS: {job.gcs_url}")
+                job.video_path.parent.mkdir(parents=True, exist_ok=True)
+                import requests
+                response = requests.get(job.gcs_url, stream=True)
+                if response.status_code == 200:
+                    with open(job.video_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    logger.info(f"✅ Original video downloaded from GCS: {job.video_path}")
+                else:
+                    raise HTTPException(status_code=400, detail=f"Failed to download video from GCS (HTTP {response.status_code})")
+            except Exception as e:
+                logger.error(f"Failed to download video from GCS: {e}")
+                raise HTTPException(status_code=400, detail=f"Video file not found and GCS download failed: {str(e)}")
+        else:
+            raise HTTPException(status_code=400, detail="Video file not found")
+
     try:
         logger.info(f"Generating word suggestions for {len(request.words_to_replace)} words")
-        
+
         # First, analyze the video to get word timings (uses singleton)
         matches = pipeline.audio_analyzer.analyze_profanity(
             video_path=job.video_path,

@@ -19,7 +19,22 @@ export interface EditVersion {
     enabled: boolean;
     timestamp: number;
     findingId?: number;
+    findingIds?: number[]; // For batch actions that resolve multiple findings
 }
+
+interface PersistedState {
+    jobId: string | null;
+    platform: string;
+    region: string;
+    rating: string;
+    findings: Finding[];
+    editHistory: EditVersion[];
+    isProcessingBatch?: boolean;
+    batchProgress?: string;
+}
+
+const STORAGE_KEY = 'VIDMOD_STATE';
+const SESSION_FLAG_KEY = 'VIDMOD_SESSION_ACTIVE';
 
 const AppLayout: React.FC = () => {
     const [activeTab, setActiveTab] = useState('Upload');
@@ -40,24 +55,133 @@ const AppLayout: React.FC = () => {
     const [editHistory, setEditHistory] = useState<EditVersion[]>([]);
     const [selectedVersion, setSelectedVersion] = useState<number | null>(null);  // For previewing specific version
 
+    // Batch processing state (persisted across tab switches)
+    const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+    const [batchProgress, setBatchProgress] = useState('');
+
     // Video library modal state
     const [showVideoLibrary, setShowVideoLibrary] = useState(false);
 
     // Current video to display
     const getDisplayVideoUrl = () => {
         if (showOriginal) {
-            console.log('Showing original video');
+            // console.log('Showing original video');
             return originalVideoUrl;
         }
         if (selectedVersion !== null) {
             const version = editHistory.find(v => v.version === selectedVersion);
-            console.log('Showing selected version:', selectedVersion, 'URL:', version?.downloadUrl);
+            // console.log('Showing selected version:', selectedVersion, 'URL:', version?.downloadUrl);
             return version?.downloadUrl || editedVideoUrl || originalVideoUrl;
         }
-        console.log('Showing latest edited video:', editedVideoUrl);
+        // console.log('Showing latest edited video:', editedVideoUrl);
         return editedVideoUrl || originalVideoUrl;
     };
     const currentVideoUrl = getDisplayVideoUrl();
+
+    // -- Persistence Logic --
+
+    // 1. Save state to sessionStorage on change
+    useEffect(() => {
+        if (jobId) {
+            const state: PersistedState = {
+                jobId,
+                platform,
+                region,
+                rating,
+                findings,
+                editHistory,
+                isProcessingBatch,
+                batchProgress
+            };
+            sessionStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        }
+    }, [jobId, platform, region, rating, findings, editHistory, isProcessingBatch, batchProgress]);
+
+    // 2. Load state on mount (only if session is active, not on page reload)
+    useEffect(() => {
+        const loadState = async () => {
+            try {
+                // Check if this is a page reload or tab switch
+                const sessionActive = sessionStorage.getItem(SESSION_FLAG_KEY);
+
+                if (!sessionActive) {
+                    // Page reload - clear everything and start fresh
+                    sessionStorage.removeItem(STORAGE_KEY);
+                    sessionStorage.setItem(SESSION_FLAG_KEY, 'true');
+                    return;
+                }
+
+                // Tab switch - restore state
+                const stored = sessionStorage.getItem(STORAGE_KEY);
+                if (!stored) return;
+
+                const state: PersistedState = JSON.parse(stored);
+
+                // Restore metadata
+                setPlatform(state.platform);
+                setRegion(state.region);
+                setRating(state.rating);
+                setFindings(state.findings || []);
+                setEditHistory(state.editHistory || []);
+                setIsProcessingBatch(state.isProcessingBatch || false);
+                setBatchProgress(state.batchProgress || '');
+
+                if (state.jobId) {
+                    setJobId(state.jobId);
+                    setActiveTab('Analysis');
+
+                    // Fetch fresh URLs from backend (blob URLs expire, so we need fresh ones)
+                    try {
+                        const res = await fetch(`${API_BASE}/status/${state.jobId}`);
+                        if (res.ok) {
+                            const statusData = await res.json();
+
+                            if (statusData.original_video_url) {
+                                // Use the persistent URL from backend (handles blobs expiring)
+                                // Use the persistent URL from backend (handles blobs expiring)
+                                let fullOrigUrl = statusData.original_video_url;
+                                if (fullOrigUrl.startsWith('/') && !fullOrigUrl.startsWith('http')) {
+                                    // Construct absolute URL assuming API is on same host or using API_BASE logic
+                                    // API_BASE usually includes /api, so we remove it to get base host
+                                    const baseUrl = API_BASE.replace(/\/api\/?$/, '');
+                                    fullOrigUrl = `${baseUrl}${statusData.original_video_url}`;
+                                }
+                                setOriginalVideoUrl(fullOrigUrl);
+                            }
+
+                            if (statusData.edited_video_url) {
+                                let fullEditedUrl = statusData.edited_video_url;
+                                if (fullEditedUrl.startsWith('/') && !fullEditedUrl.startsWith('http')) {
+                                    const baseUrl = API_BASE.replace(/\/api\/?$/, '');
+                                    fullEditedUrl = `${baseUrl}${statusData.edited_video_url}`;
+                                }
+                                // Add timestamp to prevent caching issues
+                                setEditedVideoUrl(`${fullEditedUrl}?t=${Date.now()}`);
+                                setShowOriginal(false);
+                            } else {
+                                setShowOriginal(true); // Default to original if no edit yet
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Failed to restore video URLs", e);
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to load persistence state", e);
+            }
+        };
+        loadState();
+
+        // Clear session flag on page unload (so next load is treated as fresh)
+        const handleBeforeUnload = () => {
+            sessionStorage.removeItem(SESSION_FLAG_KEY);
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, []);
 
     // Mock re-analysis when profile changes
     useEffect(() => {
@@ -72,10 +196,13 @@ const AppLayout: React.FC = () => {
     }, [platform, region, rating]);
 
     const handleFileSelected = (metadata: VideoMetadata) => {
+        sessionStorage.removeItem(STORAGE_KEY); // Clear persisted state on new file
         setVideoMetadata(metadata);
         setOriginalVideoUrl(metadata.url);
         setEditedVideoUrl(null);  // Reset edited video
         setEditHistory([]);  // Reset edit history
+        setIsProcessingBatch(false);  // Reset batch processing
+        setBatchProgress('');  // Reset batch progress
         setSelectedVersion(null);
         setShowOriginal(false);
     };
@@ -133,15 +260,36 @@ const AppLayout: React.FC = () => {
             params.append('region', region);
             params.append('rating', rating);
 
-            const response = await fetch(`${API_BASE}/analyze-video/${uploadedJobId}?${params.toString()}`, {
-                method: 'POST',
-            });
+            // Retry logic for 409 errors (video still processing)
+            let analysisSuccess = false;
+            let retryCount = 0;
+            const maxRetries = 5;
+            let data;
 
-            if (!response.ok) {
-                throw new Error(`Analysis failed: ${response.statusText}`);
+            while (!analysisSuccess && retryCount < maxRetries) {
+                const response = await fetch(`${API_BASE}/analyze-video/${uploadedJobId}?${params.toString()}`, {
+                    method: 'POST',
+                });
+
+                if (response.status === 409) {
+                    // Video still processing, wait and retry
+                    console.log(`Video still processing, retry ${retryCount + 1}/${maxRetries}...`);
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+                        continue;
+                    } else {
+                        throw new Error('Video is still processing. Please try again in a moment.');
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Analysis failed: ${response.statusText}`);
+                }
+
+                data = await response.json();
+                analysisSuccess = true;
             }
-
-            const data = await response.json();
 
             // Map API response to Finding[] format
             const mappedFindings: Finding[] = (data.findings || []).map((f: any) => ({
@@ -218,15 +366,37 @@ const AppLayout: React.FC = () => {
             params.append('region', region);
             params.append('rating', rating);
 
-            const response = await fetch(`${API_BASE}/analyze-video/${jobId}?${params.toString()}`, {
-                method: 'POST',
-            });
+            // Retry logic for 409 errors (video still processing)
+            let analysisSuccess = false;
+            let retryCount = 0;
+            const maxRetries = 5;
+            let data;
 
-            if (!response.ok) {
-                throw new Error(`Analysis failed: ${response.statusText}`);
+            while (!analysisSuccess && retryCount < maxRetries) {
+                const response = await fetch(`${API_BASE}/analyze-video/${jobId}?${params.toString()}`, {
+                    method: 'POST',
+                });
+
+                if (response.status === 409) {
+                    // Video still processing, wait and retry
+                    console.log(`Video still processing, retry ${retryCount + 1}/${maxRetries}...`);
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds
+                        continue;
+                    } else {
+                        throw new Error('Video is still processing. Please try again in a moment.');
+                    }
+                }
+
+                if (!response.ok) {
+                    throw new Error(`Analysis failed: ${response.statusText}`);
+                }
+
+                data = await response.json();
+                analysisSuccess = true;
             }
 
-            const data = await response.json();
             const mappedFindings: Finding[] = (data.findings || []).map((f: any) => ({
                 id: f.id,
                 type: f.type,
@@ -301,7 +471,8 @@ const AppLayout: React.FC = () => {
                     downloadUrl: processedUrl,
                     enabled: true,
                     timestamp: Date.now(),
-                    findingId: result.findingId
+                    findingId: result.findingId,
+                    findingIds: result.findingIds
                 };
                 console.log('Added version to history:', newVersion);
                 return [...prev, newVersion];
@@ -472,6 +643,12 @@ const AppLayout: React.FC = () => {
                                         onPreviewVersion={handlePreviewVersion}
                                         onToggleVersion={handleToggleVersion}
                                         selectedVersion={selectedVersion}
+                                        isProcessingBatch={isProcessingBatch}
+                                        batchProgress={batchProgress}
+                                        onBatchStateChange={(processing, progress) => {
+                                            setIsProcessingBatch(processing);
+                                            setBatchProgress(progress);
+                                        }}
                                     />
                                 </div>
                             </div>

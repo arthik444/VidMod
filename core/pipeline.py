@@ -66,8 +66,9 @@ class JobState:
     segmented_video_url: Optional[str] = None
     
     # GCS storage (optional - for cloud upload)
-    gcs_url: Optional[str] = None
-    
+    gcs_url: Optional[str] = None  # Original input video URL
+    output_gcs_url: Optional[str] = None  # Processed output video URL
+
     # Audio analysis cache (avoids re-analyzing in censor-audio)
     profanity_matches: Optional[list] = None  # List of ProfanityMatch objects
     profanity_analyzed_at: Optional[float] = None  # Timestamp of analysis
@@ -138,6 +139,72 @@ class VideoPipeline:
         # In-memory job storage (use Redis/DB for production)
         self.jobs: Dict[str, JobState] = {}
 
+    def prepare_input_video(self, job_id: str, use_original: bool = False) -> Path:
+        """
+        Prepare input video for the next operation.
+        If a previous output exists (chained operation), use it.
+        Otherwise use the original video.
+        Ensures input file exists locally, downloading from GCS if needed (Cloud Run).
+
+        Args:
+            job_id: Job ID
+            use_original: If True, always use original video (skip chaining).
+                         Use for replacement operations (Runway, SAM) that need the original unmodified video.
+        """
+        job = self.jobs.get(job_id)
+        if not job:
+            # Try to restore state first
+            job = self._restore_job_state(job_id)
+            if not job:
+                raise ValueError(f"Job {job_id} not found")
+            self.jobs[job_id] = job # Cache it
+
+        # Skip chaining if use_original=True (for replacement operations)
+        if not use_original:
+            # Priority 1: Use local output path if it exists (fastest for local/same-instance)
+            if job.output_path and job.output_path.exists():
+                logger.info(f"Using previous local output for chaining: {job.output_path}")
+                return job.output_path
+
+            # Priority 2: Use GCS output URL (persistence across instances)
+            if job.output_gcs_url and self.gcs_uploader:
+                logger.info(f"Downloading previous output from GCS for chaining: {job.output_gcs_url}")
+                # Download to a temporary "input_chained.mp4"
+                job_dir = self._get_job_dir(job_id)
+                chained_input_path = job_dir / f"input_chained_{uuid.uuid4().hex[:6]}.mp4"
+
+                self.gcs_uploader.download_file(job.output_gcs_url, chained_input_path)
+
+                # Verify download completed correctly
+                if chained_input_path.exists():
+                    file_size_mb = chained_input_path.stat().st_size / (1024 * 1024)
+                    logger.info(f"✅ Downloaded file size: {file_size_mb:.2f} MB")
+
+                    # Sanity check: file should be at least 1MB for a valid video
+                    if file_size_mb < 1.0:
+                        logger.error(f"❌ Downloaded file suspiciously small: {file_size_mb:.2f} MB")
+                        raise ValueError(f"Downloaded video file too small ({file_size_mb:.2f} MB), possible corruption")
+                else:
+                    logger.error(f"❌ Downloaded file not found: {chained_input_path}")
+                    raise FileNotFoundError(f"Download failed: {chained_input_path}")
+
+                return chained_input_path
+
+        # Priority 3: Fallback to Original Video (Local)
+        if job.video_path and job.video_path.exists():
+             return job.video_path
+             
+        # Priority 4: Download Original from GCS (Cloud Run restart case)
+        if job.gcs_url and self.gcs_uploader:
+             logger.info(f"Downloading original input from GCS: {job.gcs_url}")
+             job_dir = self._get_job_dir(job_id)
+             original_input_path = job_dir / f"input_restored_{uuid.uuid4().hex[:6]}.mp4"
+             self.gcs_uploader.download_file(job.gcs_url, original_input_path)
+             job.video_path = original_input_path # Update local path
+             return original_input_path
+             
+        raise ValueError("No input video found for processing (checked local and GCS).")
+
     def _save_job_state(self, job_id: str):
         """Save job state to GCS for stateless persistence."""
         if not self.gcs_uploader or job_id not in self.jobs:
@@ -154,6 +221,7 @@ class VideoPipeline:
                 "progress": job.progress,
                 "video_info": job.video_info,
                 "gcs_url": job.gcs_url,
+                "output_gcs_url": job.output_gcs_url,  # ✅ Save processed video URL!
                 "frame_paths": [str(p) for p in job.frame_paths],
                 "error": job.error
             }
@@ -207,6 +275,7 @@ class VideoPipeline:
                 progress=data["progress"],
                 video_info=data.get("video_info", {}),
                 gcs_url=data.get("gcs_url"),
+                output_gcs_url=data.get("output_gcs_url"),  # ✅ Restore processed video URL!
                 error=data.get("error")
             )
             
@@ -432,11 +501,17 @@ class VideoPipeline:
         """Get job state by ID, with disk and S3 recovery."""
         if job_id in self.jobs:
             return self.jobs[job_id]
-            
-        # Try to recover from disk (if on same instance)
+
+        # CRITICAL FIX: Try to recover from GCS FIRST (has latest state with output_gcs_url)
+        # This is essential for Cloud Run where state.json contains the authoritative state
+        job = self._restore_job_state(job_id)
+        if job:
+            return job
+
+        # Fallback: Try to recover from disk (if on same instance and GCS restore failed)
         job_dir = self.base_storage_dir / job_id
         if job_dir.exists():
-            logger.info(f"Recovering job {job_id} from disk")
+            logger.info(f"Recovering job {job_id} from disk (GCS state not available)")
             video_files = list(job_dir.glob("input.*"))
             if video_files:
                 job = JobState(
@@ -450,12 +525,11 @@ class VideoPipeline:
                 )
                 if job.frames_dir.exists():
                     job.frame_paths = sorted(job.frames_dir.glob("*.png"))
-                
+
                 self.jobs[job_id] = job
                 return job
 
-        # Try to recover from GCS (cross-instance recovery)
-        job = self._restore_job_state(job_id)
+        # Already tried GCS above, check if we got a job
         if job:
             # If video is missing locally but we have GCS URL, download it
             if job.video_path and not job.video_path.exists() and job.gcs_url:

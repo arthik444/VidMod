@@ -89,10 +89,16 @@ class GCSUploader:
         try:
             blob = self.bucket.blob(key)
             
+            # Determine content type
+            import mimetypes
+            content_type, _ = mimetypes.guess_type(str(video_path))
+            if not content_type:
+                content_type = 'video/mp4' # Default fallback
+            
             # Upload file
             blob.upload_from_filename(
                 str(video_path),
-                content_type='video/mp4'
+                content_type=content_type
             )
             
             # Make public if requested (Legacy ACL or IAM based)
@@ -102,13 +108,46 @@ class GCSUploader:
             if make_public:
                 try:
                    blob.make_public()
+                   logger.info("✅ Blob made public successfully")
                 except Exception as e:
-                    logger.warning(f"Could not make blob public (might be uniform bucket access): {e}")
+                    logger.warning(f"⚠️ Could not make blob public (might be uniform bucket access): {e}")
+                    logger.warning("Attempting to set bucket-level IAM policy for allUsers read access...")
+
+                    # Fallback: Try to make it publicly readable via metadata
+                    try:
+                        blob.metadata = {"Cache-Control": "public, max-age=3600"}
+                        blob.patch()
+
+                        # Set ACL using all_users
+                        blob.acl.all().grant_read()
+                        blob.acl.save()
+                        logger.info("✅ Blob made public via ACL")
+                    except Exception as acl_error:
+                        logger.error(f"❌ Failed to make blob public via ACL: {acl_error}")
+                        logger.info("Bucket might have Uniform Bucket-Level Access enabled. Ensure bucket has allUsers:objectViewer IAM policy.")
 
             # Generate public URL
             url = blob.public_url
             logger.info(f"✅ Video uploaded successfully: {url}")
-            
+
+            # Verify the blob is actually publicly accessible
+            if make_public:
+                try:
+                    import requests
+                    import time
+                    test_response = requests.head(url, timeout=5)
+                    if test_response.status_code == 200:
+                        logger.info(f"✅ Verified: Blob is publicly accessible (HTTP {test_response.status_code})")
+                        # Add delay to ensure CDN propagation (prevents Runway "Failed to fetch video metadata" error)
+                        logger.info("⏱️ Waiting 3s for GCS CDN propagation...")
+                        time.sleep(3)
+                    else:
+                        logger.error(f"❌ WARNING: Blob may not be publicly accessible (HTTP {test_response.status_code})")
+                        logger.error(f"This will cause Runway API to fail with 400 Bad Request!")
+                        logger.error(f"Fix: Add 'allUsers' with 'Storage Object Viewer' role to bucket: {self.bucket_name}")
+                except Exception as verify_error:
+                    logger.warning(f"Could not verify blob accessibility: {verify_error}")
+
             return url
             
         except Exception as e:
@@ -198,6 +237,80 @@ class GCSUploader:
                 except Exception as iam_error:
                     logger.error(f"IAM signing fallback failed: {iam_error}")
                     raise e  # Raise original error if fallback fails
+            
+            raise e
+
+    def generate_download_url(
+        self,
+        key: str,
+        expiration_minutes: int = 60
+    ) -> str:
+        """Generate a signed URL for downloading a file."""
+        blob = self.bucket.blob(key)
+        
+        # Try standard generation first
+        try:
+            url = blob.generate_signed_url(
+                version="v4",
+                expiration=timedelta(minutes=expiration_minutes),
+                method="GET"
+            )
+            return url
+        except Exception as e:
+            # Check for missing private key error (common on Cloud Run/GCE)
+            if "private key" in str(e).lower() or "signing" in str(e).lower():
+                # logger.info("Private key not found. Attempting IAM signing fallback for download...")
+                try:
+                    # Get default credentials
+                    creds, _ = default()
+                    
+                    # Determine Service Account Email
+                    service_account_email = self.service_account_email
+                    if not service_account_email:
+                        service_account_email = getattr(creds, "service_account_email", None)
+                    if not service_account_email or service_account_email == "default":
+                        service_account_email = os.getenv("GCS_SERVICE_ACCOUNT_EMAIL")
+                    
+                    # Metadata fallback
+                    if not service_account_email:
+                        try:
+                            import requests
+                            metadata_url = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/email"
+                            headers = {"Metadata-Flavor": "Google"}
+                            response = requests.get(metadata_url, headers=headers, timeout=1)
+                            if response.status_code == 200:
+                                service_account_email = response.text
+                        except:
+                            pass
+
+                    if not service_account_email:
+                        logger.error("Could not determine service account email for IAM signing.")
+                        raise ValueError("No service account available for signing.") 
+
+                    # Create impersonated credentials
+                    target_creds = impersonated_credentials.Credentials(
+                        source_credentials=creds,
+                        target_principal=service_account_email,
+                        target_scopes=["https://www.googleapis.com/auth/cloud-platform"],
+                        lifetime=3600
+                    )
+                    
+                    # Force refresh
+                    request = Request()
+                    target_creds.refresh(request)
+                    
+                    # Generate URL
+                    url = blob.generate_signed_url(
+                        version="v4",
+                        expiration=timedelta(minutes=expiration_minutes),
+                        method="GET",
+                        credentials=target_creds
+                    )
+                    return url
+                    
+                except Exception as iam_error:
+                    logger.error(f"IAM signing fallback failed for download: {iam_error}")
+                    raise e
             
             raise e
 
@@ -292,3 +405,39 @@ class GCSUploader:
             return blob.exists()
         except:
             return False
+
+    def download_file(self, gcs_url_or_key: str, destination_path: Path) -> Path:
+        """
+        Download a file from GCS to a local path.
+        Handles gs:// URLs, https URLs, or raw keys.
+        """
+        try:
+            # Extract key from URL if needed
+            key = gcs_url_or_key
+            if gcs_url_or_key.startswith("gs://"):
+                # gs://bucket/key
+                parts = gcs_url_or_key.replace("gs://", "").split("/", 1)
+                if len(parts) > 1:
+                    key = parts[1]
+            elif "storage.googleapis.com" in gcs_url_or_key:
+                # https://storage.googleapis.com/bucket/key
+                # Remove scheme and domain
+                path_part = gcs_url_or_key.split("storage.googleapis.com/")[-1]
+                # path_part might be bucket/key
+                parts = path_part.split("/", 1)
+                if len(parts) > 1 and parts[0] == self.bucket_name:
+                    key = parts[1]
+                else:
+                    # Maybe it's just the key if using a custom domain or path style?
+                    # Safer to assume standard format: bucket/key
+                    key = path_part.replace(f"{self.bucket_name}/", "", 1)
+            
+            blob = self.bucket.blob(key)
+            destination_path.parent.mkdir(parents=True, exist_ok=True)
+            blob.download_to_filename(str(destination_path))
+            logger.info(f"Downloaded {key} to {destination_path}")
+            return destination_path
+            
+        except Exception as e:
+            logger.error(f"Failed to download file from GCS: {e}")
+            raise
