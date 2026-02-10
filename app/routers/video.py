@@ -1738,6 +1738,9 @@ async def blur_object(
         # Save job state
         pipeline._save_job_state(request.job_id)
 
+        # Clean up temp files (GCS-as-disk architecture)
+        pipeline.cleanup_temp_files(request.job_id)
+
         return BlurEffectResponse(
             job_id=request.job_id,
             status="completed",
@@ -2207,6 +2210,9 @@ async def replace_with_runway(
 
         # Save job state
         pipeline._save_job_state(job_id)
+
+        # Clean up temp files (GCS-as-disk architecture)
+        pipeline.cleanup_temp_files(job_id)
 
         return RunwayReplaceResponse(
             job_id=job_id,
