@@ -42,7 +42,7 @@ graph TD
     User -->|4. Trigger Process| API
     
     subgraph "The Gemini Loop"
-        API -->|5. Analyze Video| Gemini[Gemini 1.5 Pro]
+        API -->|5. Analyze Video| Gemini[Gemini 3.0 Pro Preview]
         Gemini -->|6. JSON Findings| API
         API -->|7. User Review| User
         
